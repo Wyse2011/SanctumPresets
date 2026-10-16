@@ -1,0 +1,15 @@
+# Build output
+.vs/
+obj/
+bin/
+*.user
+
+# Never commit mod content (other authors' work and extracted game files belong in the mod, not here)
+*.avfx
+*.atex
+*.tex
+*.mdl
+*.pmp
+*.ttmp
+*.ttmp2
+extracted/
