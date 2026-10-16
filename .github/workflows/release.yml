@@ -1,9 +1,17 @@
 name: Release
 
-# Runs when you publish a GitHub Release (tag like v1.2.0).
-# Builds the plugin, attaches latest.zip to the release, and updates repo.json
+# Two ways to release:
+#   1. Actions tab > Release > "Run workflow", type a version like 1.2.0   (easiest)
+#   2. Publish a GitHub Release with a tag like v1.2.0
+# Either way it builds the plugin, attaches latest.zip to the release, and updates repo.json
 # so everyone using the custom repository gets the update in /xlplugins.
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.2.0"
+        required: true
+        type: string
   release:
     types: [ published ]
 
@@ -30,15 +38,22 @@ jobs:
           Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
           Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
 
-      - name: Work out version from the tag
+      - name: Work out version and tag
         id: ver
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          $v = "${{ github.event.release.tag_name }}".TrimStart('v', 'V')
-          $parts = $v.Split('.')
-          if ($parts.Count -lt 2 -or ($parts | Where-Object { $_ -notmatch '^\d+$' })) { throw "Tag must look like v1.2.0 (got '${{ github.event.release.tag_name }}')" }
+          $raw = if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { $env:INPUT_VERSION }
+          $v = $raw.Trim().TrimStart('v', 'V')
+          $parts = @($v.Split('.'))
+          if ($parts.Count -lt 2 -or $parts.Count -gt 4 -or ($parts | Where-Object { $_ -notmatch '^\d+$' })) { throw "Version must look like 1.2.0 (got '$raw')" }
+          $tag = if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { "v$v" }
           while ($parts.Count -lt 4) { $parts += '0' }
           "version=$($parts -join '.')" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "Releasing $tag as assembly version $($parts -join '.')"
 
       - name: Build
         run: dotnet build SanctumPresets/SanctumPresets.csproj --configuration Release -p:Version=${{ steps.ver.outputs.version }}
@@ -54,16 +69,29 @@ jobs:
           "zip=$($zip.FullName)" >> $env:GITHUB_OUTPUT
           "manifest=$($manifest.FullName)" >> $env:GITHUB_OUTPUT
 
+      - name: Create the release (when started from the Run workflow button)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release view "${{ steps.ver.outputs.tag }}" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "${{ steps.ver.outputs.tag }}" --target "${{ github.event.repository.default_branch }}" --title "Sanctum Presets ${{ steps.ver.outputs.tag }}" --generate-notes
+            if ($LASTEXITCODE -ne 0) { throw "Could not create the release" }
+          }
+          $global:LASTEXITCODE = 0
+
       - name: Attach latest.zip to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" "${{ steps.pkg.outputs.zip }}" --clobber
+        run: gh release upload "${{ steps.ver.outputs.tag }}" "${{ steps.pkg.outputs.zip }}" --clobber
 
       - name: Update repo.json
         shell: pwsh
         run: |
           $repo = "${{ github.repository }}"
-          $tag  = "${{ github.event.release.tag_name }}"
+          $tag  = "${{ steps.ver.outputs.tag }}"
           $url  = "https://github.com/$repo/releases/download/$tag/latest.zip"
           $m    = Get-Content "${{ steps.pkg.outputs.manifest }}" -Raw | ConvertFrom-Json
           $entry = [ordered]@{
