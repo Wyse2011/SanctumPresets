@@ -3,10 +3,10 @@
     "Author": "Sanctum",
     "Name": "Sanctum Presets",
     "InternalName": "SanctumPresets",
-    "AssemblyVersion": "1.2.0.0",
-    "TestingAssemblyVersion": "1.2.0.0",
+    "AssemblyVersion": "1.3.0.0",
+    "TestingAssemblyVersion": "1.3.0.0",
     "Punchline": "Named presets and notes for the Sanctum VFX Penumbra mod.",
-    "Description": "Pick effects for each Sanctum VFX slot with searchable dropdowns, save setups as named presets, switch looks with one click or /sanctum <preset>, and keep notes linked to effects and presets that export to a .txt file. Requires Penumbra and the Sanctum VFX 4-Slot mod.",
+    "Description": "Pick effects for each Sanctum VFX slot with searchable dropdowns, recolor every effect with a color wheel, save setups as named presets, switch looks with one click or /sanctum <preset>, and keep notes linked to effects and presets that export to a .txt file. Requires Penumbra and the Sanctum VFX 4-Slot mod.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/Wyse2011/SanctumPresets",
     "Tags": [
@@ -19,9 +19,9 @@
     "TestingDalamudApiLevel": 15,
     "IsHide": false,
     "IsTestingExclusive": false,
-    "LastUpdate": 1792185948,
-    "DownloadLinkInstall": "https://github.com/Wyse2011/SanctumPresets/releases/download/v1.2.0/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/Wyse2011/SanctumPresets/releases/download/v1.2.0/latest.zip",
-    "DownloadLinkTesting": "https://github.com/Wyse2011/SanctumPresets/releases/download/v1.2.0/latest.zip"
+    "LastUpdate": 1792186694,
+    "DownloadLinkInstall": "https://github.com/Wyse2011/SanctumPresets/releases/download/v1.3.0/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/Wyse2011/SanctumPresets/releases/download/v1.3.0/latest.zip",
+    "DownloadLinkTesting": "https://github.com/Wyse2011/SanctumPresets/releases/download/v1.3.0/latest.zip"
   }
 ]
