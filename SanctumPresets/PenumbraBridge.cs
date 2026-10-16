@@ -19,6 +19,14 @@ public interface IPenumbra
     bool SetOption(Guid collection, string modDirectory, string group, string option);
     bool SetOptions(Guid collection, string modDirectory, string group, IReadOnlyList<string> options);
     void RedrawPlayer();
+
+    /// <summary> Penumbra's root mod folder on disk. </summary>
+    string? GetModsRoot();
+
+    /// <summary> Temporarily redirect game paths to files for one collection (does not touch any mod). </summary>
+    bool AddTempMod(string tag, Guid collection, Dictionary<string, string> paths, int priority);
+
+    bool RemoveTempMod(string tag, Guid collection, int priority);
 }
 
 /// <summary>
@@ -38,6 +46,9 @@ public sealed class PenumbraBridge : IPenumbra
     private readonly ICallGateSubscriber<Guid, string, string, bool, int> trySetMod;                     // collection, modDir, modName, enabled
     private readonly ICallGateSubscriber<int, (bool, bool, (Guid, string))> getCollectionForObject;
     private readonly ICallGateSubscriber<int, int, object> redrawObject;                                 // objectIndex, redrawType
+    private readonly ICallGateSubscriber<string> getModDirectory;
+    private readonly ICallGateSubscriber<string, Guid, Dictionary<string, string>, string, int, int> addTemporaryMod; // tag, collection, paths, manips, priority
+    private readonly ICallGateSubscriber<string, Guid, int, int> removeTemporaryMod;                     // tag, collection, priority
 
     public string LastError { get; private set; } = string.Empty;
 
@@ -52,6 +63,9 @@ public sealed class PenumbraBridge : IPenumbra
         trySetMod              = pi.GetIpcSubscriber<Guid, string, string, bool, int>("Penumbra.TrySetMod.V5");
         getCollectionForObject = pi.GetIpcSubscriber<int, (bool, bool, (Guid, string))>("Penumbra.GetCollectionForObject.V5");
         redrawObject           = pi.GetIpcSubscriber<int, int, object>("Penumbra.RedrawObject.V5");
+        getModDirectory        = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
+        addTemporaryMod        = pi.GetIpcSubscriber<string, Guid, Dictionary<string, string>, string, int, int>("Penumbra.AddTemporaryMod.V5");
+        removeTemporaryMod     = pi.GetIpcSubscriber<string, Guid, int, int>("Penumbra.RemoveTemporaryMod.V5");
     }
 
     /// <summary> True if Penumbra is loaded and speaks a compatible API. </summary>
@@ -166,6 +180,40 @@ public sealed class PenumbraBridge : IPenumbra
         }
     }
 
+    public string? GetModsRoot()
+    {
+        try
+        {
+            var dir = getModDirectory.InvokeFunc();
+            return string.IsNullOrWhiteSpace(dir) ? null : dir;
+        }
+        catch (Exception e)
+        {
+            LastError = e.Message;
+            return null;
+        }
+    }
+
+    public bool AddTempMod(string tag, Guid collection, Dictionary<string, string> paths, int priority)
+        => Check(() => addTemporaryMod.InvokeFunc(tag, collection, paths, string.Empty, priority));
+
+    public bool RemoveTempMod(string tag, Guid collection, int priority)
+    {
+        try
+        {
+            var ec = removeTemporaryMod.InvokeFunc(tag, collection, priority);
+            if (ec is 0 or 1) // Success, or nothing was registered (NothingChanged)
+                return true;
+            LastError = Describe(ec);
+            return false;
+        }
+        catch (Exception e)
+        {
+            LastError = e.Message;
+            return false;
+        }
+    }
+
     private bool Check(Func<int> call)
     {
         try
@@ -193,6 +241,8 @@ public sealed class PenumbraBridge : IPenumbra
             3  => "Mod not found in Penumbra",
             4  => "Option group not found (the mod may have changed)",
             5  => "Option not found (the mod may have changed)",
+            7  => "Lower priority",
+            8  => "Invalid game path",
             11 => "Invalid argument",
             17 => "Penumbra is shutting down",
             22 => "Collection is not active",

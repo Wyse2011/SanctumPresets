@@ -16,11 +16,13 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IChatGui Chat { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static IFramework Framework { get; private set; } = null!;
 
     private const string Command = "/sanctum";
 
     public Configuration Configuration { get; }
     public Controller Controller { get; }
+    public ColorService Colors { get; }
 
     public NoteEditorWindow NoteEditor { get; }
     public FileDialogManager FileDialog { get; } = new();
@@ -31,7 +33,11 @@ public sealed class Plugin : IDalamudPlugin
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-        Controller    = new Controller(new PenumbraBridge(PluginInterface), Configuration);
+        var penumbra  = new PenumbraBridge(PluginInterface);
+        Controller    = new Controller(penumbra, Configuration);
+        Colors        = new ColorService(penumbra, Controller, Configuration,
+            System.IO.Path.Combine(PluginInterface.GetPluginConfigDirectory(), "colors"));
+        Controller.Colors = Colors;
 
         mainWindow = new MainWindow(this);
         NoteEditor = new NoteEditorWindow(this);
@@ -45,18 +51,37 @@ public sealed class Plugin : IDalamudPlugin
 
         PluginInterface.UiBuilder.Draw         += windowSystem.Draw;
         PluginInterface.UiBuilder.Draw         += FileDialog.Draw;
+        Framework.Update                       += OnFrameworkUpdate;
+
+        // Colors live in a temporary Penumbra mod that disappears on restart; bring them back.
+        if (Configuration.Color.Enabled)
+            Colors.MarkDirty(3);
         PluginInterface.UiBuilder.OpenMainUi   += ToggleMainUi;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
     }
 
     public void Dispose()
     {
+        Framework.Update                       -= OnFrameworkUpdate;
+        Colors.Dispose();
         PluginInterface.UiBuilder.Draw         -= windowSystem.Draw;
         PluginInterface.UiBuilder.Draw         -= FileDialog.Draw;
         PluginInterface.UiBuilder.OpenMainUi   -= ToggleMainUi;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi;
         windowSystem.RemoveAllWindows();
         CommandManager.RemoveHandler(Command);
+    }
+
+    private void OnFrameworkUpdate(IFramework framework)
+    {
+        try
+        {
+            Colors.Update();
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Color update failed");
+        }
     }
 
     public void ToggleMainUi()

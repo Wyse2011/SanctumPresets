@@ -25,6 +25,22 @@ public sealed class Controller
 
     public IPenumbra Penumbra => penumbra;
 
+    /// <summary> Set by the plugin; handles redraws while colors are on. </summary>
+    public ColorService? Colors { get; set; }
+
+    /// <summary> After slots change: let the color service re-color (it redraws), otherwise redraw directly. </summary>
+    private void AfterChange()
+    {
+        if (Colors != null && (config.Color.Enabled || Colors.ColoredCount > 0))
+            Colors.MarkDirty(0);
+        else if (config.AutoRedraw)
+            penumbra.RedrawPlayer();
+    }
+
+    /// <summary> Color settings to store in a preset. </summary>
+    public ColorSettings CaptureColor()
+        => config.Color.Clone();
+
     private void Ok(string msg)  { Status = msg; StatusIsError = false; }
     private void Err(string msg) { Status = msg; StatusIsError = true; }
 
@@ -91,6 +107,12 @@ public sealed class Controller
         var groups = GetGroups(mod.Directory).ToDictionary(g => g.Group, g => g, StringComparer.Ordinal);
         penumbra.SetEnabled(coll.Id, mod.Directory, true);
 
+        // Presets made before colors existed turn colors off, so the look matches what was saved.
+        if (preset.Color != null)
+            config.Color = preset.Color.Clone();
+        else
+            config.Color.Enabled = false;
+
         var failed = new List<string>();
         var applied = 0;
         foreach (var (group, options) in preset.Settings)
@@ -115,8 +137,7 @@ public sealed class Controller
             else if (!failed.Any(f => f.StartsWith(group))) failed.Add($"{group}: {penumbra.LastError}");
         }
 
-        if (config.AutoRedraw)
-            penumbra.RedrawPlayer();
+        AfterChange();
 
         if (failed.Count == 0)
         {
@@ -149,8 +170,7 @@ public sealed class Controller
             if (!ok) failed++;
         }
 
-        if (config.AutoRedraw)
-            penumbra.RedrawPlayer();
+        AfterChange();
 
         if (failed == 0) { Ok("All slots reset."); return true; }
         Err($"Reset finished with {failed} problem(s): {penumbra.LastError}");
@@ -163,7 +183,7 @@ public sealed class Controller
         if (!TryContext(out var mod, out var coll)) return;
         if (penumbra.SetOption(coll.Id, mod.Directory, group, option))
         {
-            if (config.AutoRedraw) penumbra.RedrawPlayer();
+            AfterChange();
             Ok($"{group}: {option}");
         }
         else
@@ -221,7 +241,7 @@ public sealed class Controller
 
     public static string Export(IEnumerable<Preset> presets)
     {
-        var json = JsonSerializer.Serialize(presets.Select(p => new ExportedPreset(p.Name, p.Settings)).ToList(), Json);
+        var json = JsonSerializer.Serialize(presets.Select(p => new ExportedPreset(p.Name, p.Settings, p.Color)).ToList(), Json);
         return ExportPrefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
     }
 
@@ -237,7 +257,7 @@ public sealed class Controller
             var json = Encoding.UTF8.GetString(Convert.FromBase64String(text[ExportPrefix.Length..]));
             var list = JsonSerializer.Deserialize<List<ExportedPreset>>(json, Json);
             return list?.Where(e => e.Name.Length > 0 && e.Settings != null)
-                .Select(e => new Preset { Name = e.Name, Settings = Preset.Copy(e.Settings), Saved = DateTime.Now })
+                .Select(e => new Preset { Name = e.Name, Settings = Preset.Copy(e.Settings), Color = e.Color?.Clone(), Saved = DateTime.Now })
                 .ToList();
         }
         catch
@@ -254,5 +274,5 @@ public sealed class Controller
         if (error) Err(msg); else Ok(msg);
     }
 
-    private sealed record ExportedPreset(string Name, Dictionary<string, List<string>> Settings);
+    private sealed record ExportedPreset(string Name, Dictionary<string, List<string>> Settings, ColorSettings? Color = null);
 }

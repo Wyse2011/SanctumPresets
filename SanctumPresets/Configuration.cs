@@ -17,6 +17,9 @@ public class Preset
 
     public DateTime Saved { get; set; } = DateTime.Now;
 
+    /// <summary> Color settings saved with the preset (null for presets made before colors existed). </summary>
+    public ColorSettings? Color { get; set; }
+
     public Preset Clone()
         => new()
         {
@@ -24,6 +27,7 @@ public class Preset
             Name     = Name,
             Saved    = Saved,
             Settings = Copy(Settings),
+            Color    = Color?.Clone(),
         };
 
     public static Dictionary<string, List<string>> Copy(Dictionary<string, List<string>> src)
@@ -38,7 +42,7 @@ public class Preset
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
-    public int Version { get; set; } = 2;
+    public int Version { get; set; } = 3;
 
     /// <summary> Penumbra directory name of the mod being controlled. Empty = auto-detect. </summary>
     public string ModDirectory { get; set; } = string.Empty;
@@ -53,6 +57,9 @@ public class Configuration : IPluginConfiguration
     public List<Preset> Presets { get; set; } = new();
 
     public List<Note> Notes { get; set; } = new();
+
+    /// <summary> Current color settings for the effects. </summary>
+    public ColorSettings Color { get; set; } = new();
 
     /// <summary> Folder of the last .txt export, to start the save dialog there. </summary>
     public string LastExportFolder { get; set; } = string.Empty;
