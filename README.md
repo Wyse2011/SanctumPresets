@@ -78,7 +78,14 @@ Pick **White** to drain the color out of an effect (ghostly fire, silver mist).
 
 Presets save every slot's color. Presets saved in 1.2 (one color for everything) still work.
 
-How it works: the plugin makes recolored copies of the effects you're using in its own folder and asks Penumbra to use them for your character only. Your Sanctum VFX files are never touched. Colors come back automatically after restarting the game.
+How it works: the plugin makes recolored copies of the effects you're using in a `_SanctumColors` folder inside the Sanctum VFX mod folder, and asks Penumbra to use them for your character. The mod's own files are never changed; the plugin only adds and clears that one folder. Colors come back automatically after restarting the game or reimporting the mod.
+
+### Other players (Lightless and other sync plugins)
+
+Your colors sync through **Lightless** (and other Mare-style sync plugins) like any other mod: your pairs see your colored effects without needing Sanctum Presets themselves.
+
+- Your pairs need **VFX enabled for you** in their Lightless permissions. If they've turned VFX off for you, they won't see any of your effects, colored or not.
+- After changing colors, give Lightless a moment to upload the new files; your pairs see the change once their download finishes.
 
 Some effects get their color mostly from their textures. Those still take the tint, but may not change as completely; the status line under the slots says which ones.
 

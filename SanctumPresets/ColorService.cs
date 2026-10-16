@@ -8,19 +8,24 @@ using System.Text;
 namespace SanctumPresets;
 
 /// <summary>
-/// Applies the chosen color to the effects currently selected in the mod.
-/// Recolored copies are written to the plugin's own folder and handed to Penumbra as a
-/// temporary mod for the player's collection. The mod's own files are never modified.
+/// Applies the chosen colors to the effects currently selected in the mod.
+/// Recolored copies are written to a "_SanctumColors" subfolder inside the mod's folder and handed to Penumbra
+/// as a temporary mod for the player's collection. The mod's own files are never modified.
+/// The copies live inside Penumbra's mod directory on purpose: sync plugins (Lightless, Mare forks) only share
+/// files from there, so other players see the colors too.
 /// </summary>
 public sealed class ColorService : IDisposable
 {
     public const string Tag = "SanctumPresets.Color";
+    public const string ColorFolderName = "_SanctumColors";
     public const int Priority = 9999;
 
     private readonly IPenumbra penumbra;
     private readonly Controller controller;
     private readonly Configuration config;
-    private readonly string workDir;
+    private readonly string legacyDir;
+    private string? colorDir;
+    private List<string> appliedFiles = new();
 
     private DateTime dueAt = DateTime.MaxValue;
     private DateTime nextCheck = DateTime.MinValue;
@@ -34,14 +39,17 @@ public sealed class ColorService : IDisposable
     /// <summary> Clock, replaceable in tests. </summary>
     public Func<DateTime> Now { get; set; } = () => DateTime.UtcNow;
 
-    public ColorService(IPenumbra penumbra, Controller controller, Configuration config, string workDir)
+    /// <param name="legacyDir"> Folder used by 1.2-1.5 (outside Penumbra); emptied on first use. </param>
+    public ColorService(IPenumbra penumbra, Controller controller, Configuration config, string legacyDir)
     {
         this.penumbra   = penumbra;
         this.controller = controller;
         this.config     = config;
-        this.workDir    = workDir;
-        Directory.CreateDirectory(workDir);
+        this.legacyDir  = legacyDir;
     }
+
+    /// <summary> Where the recolored copies currently live (null until colors are applied once). </summary>
+    public string? ColorDirectory => colorDir;
 
     public bool Active => config.AnyColor;
 
@@ -83,6 +91,13 @@ public sealed class ColorService : IDisposable
 
         var coll = penumbra.GetPlayerCollection();
         if (coll != null && coll.Value.Id != appliedCollection)
+        {
+            ApplyNow();
+            return;
+        }
+
+        // The copies were deleted (for example the mod was reimported, which replaces its folder): rebuild them.
+        if (appliedFiles.Any(f => !File.Exists(f)))
             ApplyNow();
     }
 
@@ -105,7 +120,9 @@ public sealed class ColorService : IDisposable
             ColoredCount      = 0;
             if (hadColor && config.AutoRedraw) penumbra.RedrawPlayer();
             Ok("Colors off: effects use their original colors.");
-            CleanWorkDir(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            appliedFiles = new();
+            if (colorDir != null) CleanDir(colorDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            CleanLegacy();
             return;
         }
 
@@ -115,6 +132,20 @@ public sealed class ColorService : IDisposable
         if (root == null) { Fail("Couldn't find Penumbra's mod folder."); return; }
         var folder = Path.Combine(root, mod.Value.Directory);
         if (!Directory.Exists(folder)) { Fail($"Mod folder not found: {folder}"); return; }
+
+        var newDir = Path.Combine(folder, ColorFolderName);
+        if (colorDir != null && !string.Equals(colorDir, newDir, StringComparison.OrdinalIgnoreCase))
+            CleanDir(colorDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase)); // switched to another mod
+        colorDir = newDir;
+        try
+        {
+            Directory.CreateDirectory(colorDir);
+        }
+        catch (Exception e)
+        {
+            Fail($"Couldn't create the color folder: {e.Message}");
+            return;
+        }
 
         try
         {
@@ -149,7 +180,7 @@ public sealed class ColorService : IDisposable
                     {
                         var bytes  = File.ReadAllBytes(source);
                         var name   = FileName(group, gamePath, bytes, s);
-                        var target = Path.Combine(workDir, name);
+                        var target = Path.Combine(colorDir, name);
                         if (!File.Exists(target))
                         {
                             var result = AvfxColor.Apply(bytes, s);
@@ -183,7 +214,9 @@ public sealed class ColorService : IDisposable
 
         appliedCollection = paths.Count > 0 ? coll.Value.Id : null;
         ColoredCount      = paths.Count;
-        CleanWorkDir(keep);
+        appliedFiles      = paths.Values.ToList();
+        CleanDir(colorDir, keep);
+        CleanLegacy();
         if (config.AutoRedraw)
             penumbra.RedrawPlayer();
 
@@ -212,6 +245,7 @@ public sealed class ColorService : IDisposable
 
         appliedCollection = null;
         ColoredCount      = 0;
+        appliedFiles      = new();
     }
 
     public void Dispose()
@@ -224,19 +258,27 @@ public sealed class ColorService : IDisposable
         return $"{slot}_{Convert.ToHexString(hash, 0, 8).ToLowerInvariant()}.avfx";
     }
 
-    private void CleanWorkDir(HashSet<string> keep)
+    private static void CleanDir(string dir, HashSet<string> keep)
     {
         try
         {
-            foreach (var f in Directory.EnumerateFiles(workDir, "*.avfx"))
+            if (!Directory.Exists(dir))
+                return;
+            foreach (var f in Directory.EnumerateFiles(dir, "*.avfx"))
                 if (!keep.Contains(Path.GetFileName(f)))
                     File.Delete(f);
+            if (keep.Count == 0 && !Directory.EnumerateFileSystemEntries(dir).Any())
+                Directory.Delete(dir);
         }
         catch
         {
             // A file still in use will be cleaned next time.
         }
     }
+
+    /// <summary> Remove copies left by 1.2-1.5, which kept them outside Penumbra's folder. </summary>
+    private void CleanLegacy()
+        => CleanDir(legacyDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
 
     private void Ok(string msg)   { LastResult = msg; LastResultIsError = false; }
     private void Fail(string msg) { LastResult = msg; LastResultIsError = true; }
