@@ -31,15 +31,51 @@ public sealed class Controller
     /// <summary> After slots change: let the color service re-color (it redraws), otherwise redraw directly. </summary>
     private void AfterChange()
     {
-        if (Colors != null && (config.Color.Enabled || Colors.ColoredCount > 0))
+        if (Colors != null && (config.AnyColor || Colors.ColoredCount > 0))
             Colors.MarkDirty(0);
         else if (config.AutoRedraw)
             penumbra.RedrawPlayer();
     }
 
-    /// <summary> Color settings to store in a preset. </summary>
-    public ColorSettings CaptureColor()
-        => config.Color.Clone();
+    /// <summary> Per-slot colors to store in a preset. </summary>
+    public Dictionary<string, ColorSettings> CaptureColors()
+    {
+        var mod = ResolveMod();
+        if (mod != null)
+            config.MigrateLegacyColor(GetGroups(mod.Value.Directory).Select(g => g.Group));
+        return config.SlotColors.Where(kv => kv.Value.Enabled).ToDictionary(kv => kv.Key, kv => kv.Value.Clone());
+    }
+
+    /// <summary> Make colors match a preset: per-slot colors, a 1.2 single color, or none. </summary>
+    public void ApplyColors(Preset preset)
+    {
+        if (preset.SlotColors != null)
+        {
+            config.SlotColors    = Preset.CopyColors(preset.SlotColors)!;
+            config.Color.Enabled = false;
+        }
+        else if (preset.Color != null)
+        {
+            config.SlotColors.Clear();
+            config.Color = preset.Color.Clone();
+        }
+        else
+        {
+            // Presets made before colors existed: original colors, so the look matches what was saved.
+            config.SlotColors.Clear();
+            config.Color.Enabled = false;
+        }
+    }
+
+    /// <summary> Turn every slot back to original colors. </summary>
+    public void ClearColors()
+    {
+        config.SlotColors.Clear();
+        config.Color.Enabled = false;
+        config.Save();
+        Colors?.MarkDirty(0);
+        Ok("All slots back to original colors.");
+    }
 
     private void Ok(string msg)  { Status = msg; StatusIsError = false; }
     private void Err(string msg) { Status = msg; StatusIsError = true; }
@@ -107,11 +143,7 @@ public sealed class Controller
         var groups = GetGroups(mod.Directory).ToDictionary(g => g.Group, g => g, StringComparer.Ordinal);
         penumbra.SetEnabled(coll.Id, mod.Directory, true);
 
-        // Presets made before colors existed turn colors off, so the look matches what was saved.
-        if (preset.Color != null)
-            config.Color = preset.Color.Clone();
-        else
-            config.Color.Enabled = false;
+        ApplyColors(preset);
 
         var failed = new List<string>();
         var applied = 0;
@@ -241,7 +273,7 @@ public sealed class Controller
 
     public static string Export(IEnumerable<Preset> presets)
     {
-        var json = JsonSerializer.Serialize(presets.Select(p => new ExportedPreset(p.Name, p.Settings, p.Color)).ToList(), Json);
+        var json = JsonSerializer.Serialize(presets.Select(p => new ExportedPreset(p.Name, p.Settings, p.Color, p.SlotColors)).ToList(), Json);
         return ExportPrefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
     }
 
@@ -257,7 +289,7 @@ public sealed class Controller
             var json = Encoding.UTF8.GetString(Convert.FromBase64String(text[ExportPrefix.Length..]));
             var list = JsonSerializer.Deserialize<List<ExportedPreset>>(json, Json);
             return list?.Where(e => e.Name.Length > 0 && e.Settings != null)
-                .Select(e => new Preset { Name = e.Name, Settings = Preset.Copy(e.Settings), Color = e.Color?.Clone(), Saved = DateTime.Now })
+                .Select(e => new Preset { Name = e.Name, Settings = Preset.Copy(e.Settings), Color = e.Color?.Clone(), SlotColors = Preset.CopyColors(e.SlotColors), Saved = DateTime.Now })
                 .ToList();
         }
         catch
@@ -274,5 +306,6 @@ public sealed class Controller
         if (error) Err(msg); else Ok(msg);
     }
 
-    private sealed record ExportedPreset(string Name, Dictionary<string, List<string>> Settings, ColorSettings? Color = null);
+    private sealed record ExportedPreset(string Name, Dictionary<string, List<string>> Settings, ColorSettings? Color = null,
+        Dictionary<string, ColorSettings>? SlotColors = null);
 }

@@ -54,7 +54,7 @@ public class ColorSettings
          + (ExcludedSlots.Count > 0 ? $", not on: {string.Join(", ", ExcludedSlots)}" : string.Empty);
 
     private static int ToByte(float v)
-        => (int)Math.Round(Math.Clamp(v, 0f, 1f) * 255);
+        => (int)Math.Round(Math.Clamp(v, 0f, 1f) * 255, MidpointRounding.AwayFromZero); // same as the color wheel's hex box
 }
 
 /// <summary>

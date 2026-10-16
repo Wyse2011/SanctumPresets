@@ -148,7 +148,8 @@ public static class NoteTools
             sb.AppendLine($"* {p.Name}   (saved {p.Saved:yyyy-MM-dd})");
             foreach (var (slot, opts) in p.Settings.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
                 sb.AppendLine($"     {slot}: {(opts.Count == 0 ? "---" : string.Join(", ", opts))}");
-            sb.AppendLine(p.Color is { Enabled: true } ? $"     Color: {p.Color.Describe()}" : "     Color: original");
+            foreach (var line in p.DescribeColors())
+                sb.AppendLine($"     Color: {line}");
             var linked = ForPreset(cfg.Notes, p.Id);
             foreach (var n in linked)
                 sb.AppendLine($"     Note ({Note.KindLabel(n.Kind)}{(n.Done ? ", done" : string.Empty)}): {n.Title}");

@@ -43,7 +43,7 @@ public sealed class ColorService : IDisposable
         Directory.CreateDirectory(workDir);
     }
 
-    public bool Active => config.Color.Enabled;
+    public bool Active => config.AnyColor;
 
     /// <summary> Ask for a re-apply after a short delay (so dragging the color wheel stays smooth). </summary>
     public void MarkDirty(double delaySeconds = 0.25)
@@ -73,7 +73,7 @@ public sealed class ColorService : IDisposable
         if (now < nextCheck)
             return;
         nextCheck = now.AddSeconds(5);
-        if (!config.Color.Enabled)
+        if (!config.AnyColor)
             return;
         if (!penumbra.IsAvailable(out _))
         {
@@ -97,7 +97,7 @@ public sealed class ColorService : IDisposable
         if (appliedCollection != null && appliedCollection != coll.Value.Id)
             penumbra.RemoveTempMod(Tag, appliedCollection.Value, Priority);
 
-        if (!config.Color.Enabled)
+        if (!config.AnyColor)
         {
             var hadColor = appliedCollection != null || ColoredCount > 0;
             penumbra.RemoveTempMod(Tag, coll.Value.Id, Priority);
@@ -130,7 +130,6 @@ public sealed class ColorService : IDisposable
         var current = penumbra.GetCurrent(coll.Value.Id, mod.Value.Directory);
         if (current == null) { Fail($"Couldn't read the mod's settings: {penumbra.LastError}"); return; }
 
-        var s        = config.Color;
         var paths    = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var keep     = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var problems = new List<string>();
@@ -138,7 +137,8 @@ public sealed class ColorService : IDisposable
 
         foreach (var (group, options) in current.Value.Settings.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
         {
-            if (s.ExcludedSlots.Contains(group))
+            var s = config.ColorFor(group);
+            if (s == null)
                 continue;
 
             foreach (var option in options.Where(o => o.Trim() != "---"))

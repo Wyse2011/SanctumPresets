@@ -103,7 +103,7 @@ public sealed class MainWindow : Window
                     if (tab)
                     {
                         DrawSlots();
-                        DrawColor();
+                        DrawColorSummary();
                         ImGui.Separator();
                         DrawSavePreset();
                         DrawPresetList();
@@ -158,7 +158,7 @@ public sealed class MainWindow : Window
             {
                 ImGui.TableSetupColumn("slot", ImGuiTableColumnFlags.WidthFixed, 150);
                 ImGui.TableSetupColumn("pick", ImGuiTableColumnFlags.WidthStretch);
-                ImGui.TableSetupColumn("notes", ImGuiTableColumnFlags.WidthFixed, 95);
+                ImGui.TableSetupColumn("tools", ImGuiTableColumnFlags.WidthFixed, 150);
                 foreach (var g in groups)
                 {
                     ImGui.TableNextRow();
@@ -179,7 +179,12 @@ public sealed class MainWindow : Window
                     }
 
                     ImGui.TableNextColumn();
-                    DrawSlotNotes(g.Group, sel);
+                    using (ImRaii.PushId(g.Group))
+                    {
+                        DrawSlotColorButton(g.Group, sel);
+                        ImGui.SameLine();
+                        DrawSlotNotes(g.Group, sel);
+                    }
                 }
             }
         }
@@ -251,6 +256,7 @@ public sealed class MainWindow : Window
     };
 
     private bool colorConfigDirty;
+    private ColorSettings? copiedColor;
 
     private void ColorChanged(double delay = 0.25)
     {
@@ -258,103 +264,191 @@ public sealed class MainWindow : Window
         plugin.Colors.MarkDirty(delay);
     }
 
-    private void DrawColor()
+    /// <summary> Before editing a single slot, turn a 1.2 "one color for everything" into per-slot colors. </summary>
+    private void MigrateLegacy()
     {
-        var c = Config.Color;
-        if (!ImGui.CollapsingHeader("Color", ImGuiTreeNodeFlags.DefaultOpen))
-            return;
+        if (Config.Color.Enabled)
+            Config.MigrateLegacyColor(groups.Where(g => g.Type == 0).Select(g => g.Group));
+    }
 
-        var enabled = c.Enabled;
-        if (ImGui.Checkbox("Color the effects", ref enabled))
+    /// <summary> The colored square (or "Color" button) on each slot row; opens that slot's adjuster. </summary>
+    private void DrawSlotColorButton(string slot, string effect)
+    {
+        var c = Config.ColorFor(slot);
+        bool clicked;
+        if (c != null)
         {
-            c.Enabled = enabled;
+            var v4 = new Vector4(c.R, c.G, c.B, 1f);
+            clicked = ImGui.ColorButton("##slotcolor", v4, ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoTooltip, new Vector2(46, ImGui.GetFrameHeight()));
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"{slot}: {c.Describe()}\nClick to change.");
+        }
+        else
+        {
+            clicked = ImGui.Button("Color##slotcolor", new Vector2(46, 0));
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"{slot} uses its original colors. Click to color it.");
+        }
+
+        if (clicked)
+        {
+            MigrateLegacy();
+            ImGui.OpenPopup("slotcolorpopup");
+        }
+
+        using var popup = ImRaii.Popup("slotcolorpopup");
+        if (popup)
+            DrawSlotColorEditor(slot, effect);
+    }
+
+    private void DrawSlotColorEditor(string slot, string effect)
+    {
+        var c = Config.SlotColor(slot);
+
+        ImGui.Text(slot);
+        ImGui.SameLine();
+        ImGui.TextDisabled(effect.Trim() == "---" ? "(no effect chosen)" : effect);
+
+        var on = c.Enabled;
+        if (ImGui.Checkbox("Color this slot", ref on))
+        {
+            c.Enabled = on;
             ColorChanged(0);
         }
 
+        if (!c.Enabled)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled("(original colors)");
+        }
+
+        // Picking a color, swatch or slider turns the slot on: that's clearly what the user wants.
+        var col = new Vector3(c.R, c.G, c.B);
+        ImGui.SetNextItemWidth(200);
+        if (ImGui.ColorPicker3("##wheel", ref col,
+                ImGuiColorEditFlags.PickerHueWheel | ImGuiColorEditFlags.NoSidePreview | ImGuiColorEditFlags.DisplayHex | ImGuiColorEditFlags.NoAlpha))
+        {
+            (c.R, c.G, c.B) = (col.X, col.Y, col.Z);
+            c.Enabled = true;
+            ColorChanged();
+        }
+
         ImGui.SameLine();
-        var colors = plugin.Colors;
-        if (colors.LastResult.Length > 0)
+        ImGui.BeginGroup();
+
+        for (var i = 0; i < Swatches.Length; i++)
+        {
+            var (name, sw) = Swatches[i];
+            if (i > 0 && i % 4 != 0) ImGui.SameLine();
+            if (ImGui.ColorButton($"{name}##sw{i}", new Vector4(sw, 1f), ImGuiColorEditFlags.NoAlpha, new Vector2(28, 28)))
+            {
+                (c.R, c.G, c.B) = (sw.X, sw.Y, sw.Z);
+                c.Enabled = true;
+                ColorChanged(0);
+            }
+        }
+
+        ImGui.Spacing();
+        if (ImGui.RadioButton("Recolor", c.Mode == ColorMode.Recolor)) { c.Mode = ColorMode.Recolor; c.Enabled = true; ColorChanged(0); }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Shifts every colored part of the effect to this color. White-hot parts stay white.");
+        ImGui.SameLine();
+        if (ImGui.RadioButton("Tint", c.Mode == ColorMode.Tint)) { c.Mode = ColorMode.Tint; c.Enabled = true; ColorChanged(0); }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Multiplies the whole effect by this color, like a colored filter.");
+
+        var strength = c.Strength * 100f;
+        ImGui.SetNextItemWidth(150);
+        if (ImGui.SliderFloat("Strength", ref strength, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
+        {
+            c.Strength = strength / 100f;
+            c.Enabled  = true;
+            ColorChanged();
+        }
+
+        var bright = c.Brightness * 100f;
+        ImGui.SetNextItemWidth(150);
+        if (ImGui.SliderFloat("Brightness", ref bright, 20f, 300f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
+        {
+            c.Brightness = bright / 100f;
+            c.Enabled    = true;
+            ColorChanged();
+        }
+
+        ImGui.Spacing();
+        if (ImGui.Button("Same on all slots"))
+        {
+            foreach (var g in groups.Where(g => g.Type == 0 && g.Group != slot))
+            {
+                var copy = c.Clone();
+                copy.Enabled = true;
+                Config.SlotColors[g.Group] = copy;
+            }
+
+            c.Enabled = true;
+            ColorChanged(0);
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Give every slot this color.");
+
+        if (ImGui.Button("Copy"))
+            copiedColor = c.Clone();
+        ImGui.SameLine();
+        using (ImRaii.Disabled(copiedColor == null))
+        {
+            if (ImGui.Button("Paste") && copiedColor != null)
+            {
+                var pasted = copiedColor.Clone();
+                pasted.Enabled = true;
+                Config.SlotColors[slot] = pasted;
+                ColorChanged(0);
+            }
+        }
+
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip(copiedColor == null ? "Copy a color from any slot first." : "Paste " + copiedColor.Describe());
+
+        ImGui.SameLine();
+        if (ImGui.Button("Original colors"))
+        {
+            c.Enabled = false;
+            ColorChanged(0);
+        }
+
+        ImGui.EndGroup();
+        SaveColorsWhenReleased();
+    }
+
+    /// <summary> One line under the slots: how many are colored, the last result, and a clear button. </summary>
+    private void DrawColorSummary()
+    {
+        var colored = groups.Count(g => g.Type == 0 && Config.ColorFor(g.Group) != null);
+        var colors  = plugin.Colors;
+        if (colored == 0)
+        {
+            ImGui.TextDisabled("Colors: original. Click \"Color\" on a slot to recolor it.");
+        }
+        else
+        {
+            ImGui.Text($"Colors: {colored} slot{(colored == 1 ? "" : "s")} recolored.");
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Clear all colors"))
+                Ctl.ClearColors();
+        }
+
+        if (colors.LastResult.Length > 0 && (colored > 0 || colors.LastResultIsError))
         {
             if (colors.LastResultIsError) ImGui.TextColored(ImGuiColors.DalamudRed, colors.LastResult);
             else ImGui.TextDisabled(colors.LastResult);
         }
 
-        using (ImRaii.Disabled(!c.Enabled))
-        {
-            var col = new Vector3(c.R, c.G, c.B);
-            ImGui.SetNextItemWidth(200);
-            if (ImGui.ColorPicker3("##colorwheel", ref col,
-                    ImGuiColorEditFlags.PickerHueWheel | ImGuiColorEditFlags.NoSidePreview | ImGuiColorEditFlags.DisplayHex | ImGuiColorEditFlags.NoAlpha))
-            {
-                (c.R, c.G, c.B) = (col.X, col.Y, col.Z);
-                ColorChanged();
-            }
+        SaveColorsWhenReleased();
+    }
 
-            ImGui.SameLine();
-            ImGui.BeginGroup();
-
-            // Quick swatches
-            for (var i = 0; i < Swatches.Length; i++)
-            {
-                var (name, sw) = Swatches[i];
-                if (i > 0 && i % 4 != 0) ImGui.SameLine();
-                var v4 = new Vector4(sw, 1f);
-                if (ImGui.ColorButton($"{name}##sw{i}", v4, ImGuiColorEditFlags.NoAlpha, new Vector2(28, 28)))
-                {
-                    (c.R, c.G, c.B) = (sw.X, sw.Y, sw.Z);
-                    ColorChanged(0);
-                }
-            }
-
-            ImGui.Spacing();
-            if (ImGui.RadioButton("Recolor", c.Mode == ColorMode.Recolor)) { c.Mode = ColorMode.Recolor; ColorChanged(0); }
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Shifts every colored part of the effect to this color. White-hot parts stay white.");
-            ImGui.SameLine();
-            if (ImGui.RadioButton("Tint", c.Mode == ColorMode.Tint)) { c.Mode = ColorMode.Tint; ColorChanged(0); }
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Multiplies the whole effect by this color, like a colored filter.");
-
-            var strength = c.Strength * 100f;
-            ImGui.SetNextItemWidth(170);
-            if (ImGui.SliderFloat("Strength", ref strength, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
-            {
-                c.Strength = strength / 100f;
-                ColorChanged();
-            }
-
-            var bright = c.Brightness * 100f;
-            ImGui.SetNextItemWidth(170);
-            if (ImGui.SliderFloat("Brightness", ref bright, 20f, 300f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
-            {
-                c.Brightness = bright / 100f;
-                ColorChanged();
-            }
-
-            ImGui.Spacing();
-            ImGui.Text("Color these slots:");
-            foreach (var g in groups.Where(g => g.Type == 0))
-            {
-                var on = !c.ExcludedSlots.Contains(g.Group);
-                if (ImGui.Checkbox(g.Group + "##colorslot", ref on))
-                {
-                    if (on) c.ExcludedSlots.Remove(g.Group);
-                    else if (!c.ExcludedSlots.Contains(g.Group)) c.ExcludedSlots.Add(g.Group);
-                    ColorChanged(0);
-                }
-            }
-
-            if (ImGui.Button("Reset color settings"))
-            {
-                var keepOn = c.Enabled;
-                Config.Color = new ColorSettings { Enabled = keepOn };
-                ColorChanged(0);
-            }
-
-            ImGui.EndGroup();
-        }
-
-        // Save once the mouse is released, not on every frame of a drag.
+    /// <summary> Save once the mouse is released, not on every frame of a drag. </summary>
+    private void SaveColorsWhenReleased()
+    {
         if (colorConfigDirty && !ImGui.IsMouseDown(ImGuiMouseButton.Left))
         {
             colorConfigDirty = false;
@@ -382,12 +476,13 @@ public sealed class MainWindow : Window
                     if (existing != null)
                     {
                         existing.Settings = captured;
-                        existing.Color    = Ctl.CaptureColor();
+                        existing.SlotColors = Ctl.CaptureColors();
+                        existing.Color      = null;
                         existing.Saved    = DateTime.Now;
                     }
                     else
                     {
-                        Config.Presets.Add(new Preset { Name = name, Settings = captured, Color = Ctl.CaptureColor() });
+                        Config.Presets.Add(new Preset { Name = name, Settings = captured, SlotColors = Ctl.CaptureColors() });
                     }
 
                     Config.Save();
@@ -472,7 +567,8 @@ public sealed class MainWindow : Window
                 if (captured != null)
                 {
                     p.Settings = captured;
-                    p.Color    = Ctl.CaptureColor();
+                    p.SlotColors = Ctl.CaptureColors();
+                    p.Color      = null;
                     p.Saved    = DateTime.Now;
                     Config.Save();
                     Ctl.Report($"Updated \"{p.Name}\" with the current setup.");
@@ -541,7 +637,7 @@ public sealed class MainWindow : Window
     {
         var lines = p.Settings.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
             .Select(kv => $"{kv.Key}: {(kv.Value.Count == 0 ? "---" : string.Join(", ", kv.Value))}");
-        var color = p.Color is { Enabled: true } ? $"\nColor: {p.Color.Describe()}" : "\nColor: original";
+        var color = "\n" + string.Join("\n", p.DescribeColors().Select(l => "Color: " + l));
         return string.Join("\n", lines) + color + $"\n\nSaved {p.Saved:g}.  Chat: /sanctum {p.Name}";
     }
 
@@ -742,7 +838,7 @@ public sealed class MainWindow : Window
                 foreach (var p in imported)
                 {
                     var existing = Ctl.FindPreset(p.Name);
-                    if (existing != null) { existing.Settings = p.Settings; existing.Color = p.Color; existing.Saved = DateTime.Now; replaced++; }
+                    if (existing != null) { existing.Settings = p.Settings; existing.Color = p.Color; existing.SlotColors = p.SlotColors; existing.Saved = DateTime.Now; replaced++; }
                     else { Config.Presets.Add(p); added++; }
                 }
 
