@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="SanctumPresets/SanctumPresets.csproj">
+    <Platform Project="x64" />
+  </Project>
+</Solution>
