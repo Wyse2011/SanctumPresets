@@ -4,7 +4,7 @@
 [![Build](https://github.com/Wyse2011/SanctumPresets/actions/workflows/build.yml/badge.svg)](https://github.com/Wyse2011/SanctumPresets/actions/workflows/build.yml)
 ![Dalamud API 15](https://img.shields.io/badge/Dalamud%20API-15-blue)
 
-**Remote control for the Sanctum VFX mod.** Pick the effect for each slot, give each slot its own color, save the look as a named preset, and switch between looks with one click or a chat command. Keep notes on effects that need fixing and ideas for new looks, then export them to a text file.
+**Remote control for the Sanctum VFX mod.** Pick the effect for each slot, give each slot its own color and speed, save the look as a named preset, and switch between looks with one click or a chat command. Keep notes on effects that need fixing and ideas for new looks, then export them to a text file.
 
 ---
 
@@ -12,7 +12,7 @@
 
 - **Searchable slot dropdowns.** Type "fog" or "kk" to find an effect among hundreds instead of scrolling.
 - **Named presets.** Save the current setup, then apply, update, rename, reorder or delete it.
-- **Per-slot colors.** Give each slot its own color with a color wheel, live, with strength and brightness sliders. The mod's files are never changed.
+- **Customize each slot.** Give each slot its own color (color wheel, strength, brightness) and playback speed (25% to 400%), live. The mod's files are never changed.
 - **One-click reset.** Set every slot back to `---`.
 - **Automatic redraw** after every change, so you see effects immediately.
 - **Notes.** Mark effects that need fixing ("mist needs to be lowered"), record ideas, and link notes to specific effects, slots and presets. Slots with open notes show a yellow marker.
@@ -56,9 +56,11 @@ Updates arrive through `/xlplugins` like any other plugin.
 3. Type a name like `Molten Night` next to **Save as new preset** and click it.
 4. Later, click **Apply** next to the preset, or type `/sanctum Molten Night`.
 
-## Colors
+## Customizing a slot (color and speed)
 
-Each slot has a **Color** button next to **+ Note**. Click it to open that slot's color adjuster. Once a slot is colored, the button shows its color.
+Each slot has a **Customize** button next to **+ Note**. Click it to open that slot's adjuster. Once a slot is colored, the button takes on its color; if its speed is changed, the button shows it (for example **Customize 2x**).
+
+**Color**
 
 | Control | What it does |
 |---|---|
@@ -68,24 +70,30 @@ Each slot has a **Color** button next to **+ Note**. Click it to open that slot'
 | **Tint** | Multiplies the whole effect by your color, like a colored filter. |
 | **Strength** | 0% = original colors, 100% = fully your color. |
 | **Brightness** | Makes the effect dimmer or brighter (20% to 300%). |
-| **Same on all slots** | Gives every slot this color. |
-| **Copy / Paste** | Copy a color from one slot and paste it on another. |
-| **Original colors** | Puts this slot back to its normal colors. |
-
-The color belongs to the **slot**: pick a different effect in that slot and it gets the same color. **Clear all colors** (under the slots) puts every slot back to normal.
 
 Pick **White** to drain the color out of an effect (ghostly fire, silver mist).
 
-Presets save every slot's color. Presets saved in 1.2 (one color for everything) still work.
+**Speed**
 
-How it works: the plugin makes recolored copies of the effects you're using in a `_SanctumColors` folder inside the Sanctum VFX mod folder, and asks Penumbra to use them for your character. The mod's own files are never changed; the plugin only adds and clears that one folder. Colors come back automatically after restarting the game or reimporting the mod.
+| Control | What it does |
+|---|---|
+| **Speed slider** | 25% (four times slower) to 400% (four times faster). Ctrl+click to type an exact value. |
+| **0.5x / 0.75x / Normal / 1.5x / 2x / 3x** | Quick settings. |
 
-### Other players (Lightless and other sync plugins)
+Speed changes the whole effect consistently: animations, fades, texture scrolling, how long particles live, how often they spawn, how fast they move, spin and fall.
 
-Your colors sync through **Lightless** (and other Mare-style sync plugins) like any other mod: your pairs see your colored effects without needing Sanctum Presets themselves.
+**Buttons**
 
-- Your pairs need **VFX enabled for you** in their Lightless permissions. If they've turned VFX off for you, they won't see any of your effects, colored or not.
-- After changing colors, give Lightless a moment to upload the new files; your pairs see the change once their download finishes.
+| Button | What it does |
+|---|---|
+| **Same on all slots** | Gives every slot this color and speed. |
+| **Copy / Paste** | Copy a slot's color and speed and paste them on another slot. |
+| **Original colors** | Puts this slot's colors back to normal (keeps its speed). |
+| **Reset slot** | Original colors and normal speed. |
+
+Customizing belongs to the **slot**: pick a different effect in that slot and it gets the same color and speed. **Reset all customizing** (under the slots) puts every slot back to normal. Presets save every slot's color and speed. Presets saved in 1.2 (one color for everything) still work.
+
+How it works: the plugin makes customized copies of the effects you're using in a `_SanctumColors` folder inside the Sanctum VFX mod folder, and asks Penumbra to use them for your character. The mod's own files are never changed; the plugin only adds and clears that one folder. Customizing comes back automatically after restarting the game or reimporting the mod.
 
 Some effects get their color mostly from their textures. Those still take the tint, but may not change as completely; the status line under the slots says which ones.
 
@@ -93,8 +101,8 @@ Some effects get their color mostly from their textures. Those still take the ti
 
 | Button | What it does |
 |---|---|
-| **Apply** | Sets all slots and the color, turns the mod on if it was off, and redraws you |
-| **Update** | Replaces the preset with your current setup and color |
+| **Apply** | Sets all slots with their colors and speeds, turns the mod on if it was off, and redraws you |
+| **Update** | Replaces the preset with your current setup, colors and speeds |
 | **Note** | Writes a note linked to this preset |
 | **Rename** | Renames it (notes stay linked) |
 | **^** / **v** | Moves it up or down the list |
@@ -141,7 +149,7 @@ Notes are for keeping track of what needs to change and what you'd like to try.
 | "Couldn't find a mod named like Sanctum VFX" | Open **Settings** at the bottom of the window and pick the mod. |
 | Effects don't show up | Wear the accessory for that slot (see Requirements) and click **Redraw me**. |
 | Two Sanctum mods installed | Keep only one enabled in Penumbra. The plugin prefers the 4-Slot version. |
-| Colors don't change | Click the slot's **Color** button and make sure **Color this slot** is ticked. The status line under the slots shows what happened. |
+| Colors or speed don't change | Click the slot's **Customize** button and check **Color this slot** / the speed slider. The status line under the slots shows what happened. |
 | "... no longer exists" when applying | That effect was renamed or removed in a mod update. The slot falls back to `---`; pick a new effect and click **Update**. |
 
 Errors show in red at the bottom of the window. For more detail, type `/xllog` and look for lines mentioning `SanctumPresets`.

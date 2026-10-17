@@ -183,10 +183,18 @@ public sealed class ColorService : IDisposable
                         var target = Path.Combine(colorDir, name);
                         if (!File.Exists(target))
                         {
-                            var result = AvfxColor.Apply(bytes, s);
-                            File.WriteAllBytes(target, result.Data);
-                            if (s.Mode == ColorMode.Recolor && result.LayerColorsChanged == 0)
-                                weak.Add(option);
+                            var data = bytes;
+                            if (s.Enabled)
+                            {
+                                var result = AvfxColor.Apply(data, s);
+                                data = result.Data;
+                                if (s.Mode == ColorMode.Recolor && result.LayerColorsChanged == 0)
+                                    weak.Add(option);
+                            }
+
+                            if (s.SpeedChanged)
+                                data = AvfxSpeed.Apply(data, s.Speed).Data;
+                            File.WriteAllBytes(target, data);
                         }
 
                         paths[gamePath] = target;
@@ -221,11 +229,11 @@ public sealed class ColorService : IDisposable
             penumbra.RedrawPlayer();
 
         if (problems.Count > 0)
-            Fail($"Colored {paths.Count} effect(s); problems: {string.Join("; ", problems)}");
+            Fail($"Customized {paths.Count} effect(s); problems: {string.Join("; ", problems)}");
         else if (paths.Count == 0)
-            Ok("No effects selected to color.");
+            Ok("No effects selected to customize.");
         else
-            Ok($"Colored {paths.Count} effect(s)." + (weak.Count > 0 ? $" Only tinted (no layer colors to shift): {string.Join(", ", weak.Distinct())}" : string.Empty));
+            Ok($"Customized {paths.Count} effect(s)." + (weak.Count > 0 ? $" Only tinted (no layer colors to shift): {string.Join(", ", weak.Distinct())}" : string.Empty));
     }
 
     /// <summary> Remove the colored effects from Penumbra (used when the plugin unloads). </summary>

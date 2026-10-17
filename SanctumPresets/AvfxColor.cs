@@ -29,6 +29,16 @@ public class ColorSettings
     /// <summary> Overall brightness multiplier. </summary>
     public float Brightness { get; set; } = 1.0f;
 
+    /// <summary> Playback speed: 1 = normal, 0.5 = half speed, 2 = double speed. </summary>
+    public float Speed { get; set; } = 1f;
+
+    /// <summary> True if this slot changes anything: a color, a speed, or both. </summary>
+    public bool IsCustomized
+        => Enabled || Math.Abs(Speed - 1f) > 0.001f;
+
+    public bool SpeedChanged
+        => Math.Abs(Speed - 1f) > 0.001f;
+
     /// <summary> Slots (option group names) that keep their original colors. </summary>
     public System.Collections.Generic.List<string> ExcludedSlots { get; set; } = new();
 
@@ -42,16 +52,22 @@ public class ColorSettings
             Mode          = Mode,
             Strength      = Strength,
             Brightness    = Brightness,
+            Speed         = Speed,
             ExcludedSlots = new(ExcludedSlots),
         };
 
     /// <summary> Stable text used to name generated files, so a change in settings gives a new file. </summary>
     public string Fingerprint()
-        => FormattableString.Invariant($"{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}");
+        => FormattableString.Invariant($"{(Enabled ? 1 : 0)}|{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}|{Speed:0.###}");
 
     public string Describe()
-        => FormattableString.Invariant($"#{ToByte(R):X2}{ToByte(G):X2}{ToByte(B):X2}, {(Mode == ColorMode.Recolor ? "recolor" : "tint")}, strength {Strength * 100:0}%, brightness {Brightness * 100:0}%")
-         + (ExcludedSlots.Count > 0 ? $", not on: {string.Join(", ", ExcludedSlots)}" : string.Empty);
+    {
+        var color = Enabled
+            ? FormattableString.Invariant($"#{ToByte(R):X2}{ToByte(G):X2}{ToByte(B):X2}, {(Mode == ColorMode.Recolor ? "recolor" : "tint")}, strength {Strength * 100:0}%, brightness {Brightness * 100:0}%")
+            : "original colors";
+        var speed = SpeedChanged ? FormattableString.Invariant($", speed {Speed * 100:0}%") : string.Empty;
+        return color + speed + (ExcludedSlots.Count > 0 ? $", not on: {string.Join(", ", ExcludedSlots)}" : string.Empty);
+    }
 
     private static int ToByte(float v)
         => (int)Math.Round(Math.Clamp(v, 0f, 1f) * 255, MidpointRounding.AwayFromZero); // same as the color wheel's hex box

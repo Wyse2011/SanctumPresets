@@ -43,7 +43,7 @@ public sealed class Controller
         var mod = ResolveMod();
         if (mod != null)
             config.MigrateLegacyColor(GetGroups(mod.Value.Directory).Select(g => g.Group));
-        return config.SlotColors.Where(kv => kv.Value.Enabled).ToDictionary(kv => kv.Key, kv => kv.Value.Clone());
+        return config.SlotColors.Where(kv => kv.Value.IsCustomized).ToDictionary(kv => kv.Key, kv => kv.Value.Clone());
     }
 
     /// <summary> Make colors match a preset: per-slot colors, a 1.2 single color, or none. </summary>
@@ -74,7 +74,7 @@ public sealed class Controller
         config.Color.Enabled = false;
         config.Save();
         Colors?.MarkDirty(0);
-        Ok("All slots back to original colors.");
+        Ok("All slots back to original colors and speed.");
     }
 
     private void Ok(string msg)  { Status = msg; StatusIsError = false; }

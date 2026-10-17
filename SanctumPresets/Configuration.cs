@@ -43,7 +43,7 @@ public class Preset
     {
         if (SlotColors != null)
         {
-            var on = SlotColors.Where(kv => kv.Value.Enabled).OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).ToList();
+            var on = SlotColors.Where(kv => kv.Value.IsCustomized).OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).ToList();
             if (on.Count == 0) { yield return "original"; yield break; }
             foreach (var (slot, c) in on)
                 yield return $"{slot}: {c.Describe()}";
@@ -92,18 +92,18 @@ public class Configuration : IPluginConfiguration
     /// <summary> Single color from 1.2 (one color for every slot). Kept so old settings still work; moved into SlotColors on first edit. </summary>
     public ColorSettings Color { get; set; } = new();
 
-    /// <summary> The color a slot should use, or null for original colors. </summary>
+    /// <summary> A slot's customization (color and/or speed), or null if it plays unchanged. </summary>
     public ColorSettings? ColorFor(string slot)
     {
         if (SlotColors.TryGetValue(slot, out var c))
-            return c.Enabled ? c : null;
+            return c.IsCustomized ? c : null;
         if (Color.Enabled && !Color.ExcludedSlots.Contains(slot))
             return Color;
         return null;
     }
 
     public bool AnyColor
-        => Color.Enabled || SlotColors.Values.Any(c => c.Enabled);
+        => Color.Enabled || SlotColors.Values.Any(c => c.IsCustomized);
 
     /// <summary> Turn a 1.2 single color into per-slot colors (called before editing per slot). </summary>
     public void MigrateLegacyColor(IEnumerable<string> slots)

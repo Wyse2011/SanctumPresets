@@ -158,7 +158,7 @@ public sealed class MainWindow : Window
             {
                 ImGui.TableSetupColumn("slot", ImGuiTableColumnFlags.WidthFixed, 150);
                 ImGui.TableSetupColumn("pick", ImGuiTableColumnFlags.WidthStretch);
-                ImGui.TableSetupColumn("tools", ImGuiTableColumnFlags.WidthFixed, 150);
+                ImGui.TableSetupColumn("tools", ImGuiTableColumnFlags.WidthFixed, 215);
                 foreach (var g in groups)
                 {
                     ImGui.TableNextRow();
@@ -271,24 +271,29 @@ public sealed class MainWindow : Window
             Config.MigrateLegacyColor(groups.Where(g => g.Type == 0).Select(g => g.Group));
     }
 
-    /// <summary> The colored square (or "Color" button) on each slot row; opens that slot's adjuster. </summary>
+    /// <summary> The "Customize" button on each slot row (tinted with the slot's color); opens that slot's adjuster. </summary>
     private void DrawSlotColorButton(string slot, string effect)
     {
         var c = Config.ColorFor(slot);
-        bool clicked;
-        if (c != null)
+        var pushed = 0;
+        if (c is { Enabled: true })
         {
-            var v4 = new Vector4(c.R, c.G, c.B, 1f);
-            clicked = ImGui.ColorButton("##slotcolor", v4, ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoTooltip, new Vector2(46, ImGui.GetFrameHeight()));
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{slot}: {c.Describe()}\nClick to change.");
+            var col  = new Vector4(c.R, c.G, c.B, 1f);
+            var luma = 0.299f * c.R + 0.587f * c.G + 0.114f * c.B;
+            ImGui.PushStyleColor(ImGuiCol.Button, col);
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, col * new Vector4(0.85f, 0.85f, 0.85f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, col * new Vector4(0.7f, 0.7f, 0.7f, 1f));
+            ImGui.PushStyleColor(ImGuiCol.Text, luma > 0.6f ? new Vector4(0, 0, 0, 1) : new Vector4(1, 1, 1, 1));
+            pushed = 4;
         }
-        else
-        {
-            clicked = ImGui.Button("Color##slotcolor", new Vector2(46, 0));
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{slot} uses its original colors. Click to color it.");
-        }
+
+        var label = c is { SpeedChanged: true } ? FormattableString.Invariant($"Customize {c.Speed:0.##}x") : "Customize";
+        var clicked = ImGui.Button(label + "##customize", new Vector2(110, 0));
+        if (pushed > 0)
+            ImGui.PopStyleColor(pushed);
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(c != null ? $"{slot}: {c.Describe()}\nClick to change." : $"{slot} plays normally. Click to change its color or speed.");
 
         if (clicked)
         {
@@ -309,6 +314,8 @@ public sealed class MainWindow : Window
         ImGui.SameLine();
         ImGui.TextDisabled(effect.Trim() == "---" ? "(no effect chosen)" : effect);
 
+        ImGui.Separator();
+        ImGui.Text("Color");
         var on = c.Enabled;
         if (ImGui.Checkbox("Color this slot", ref on))
         {
@@ -375,22 +382,50 @@ public sealed class MainWindow : Window
             ColorChanged();
         }
 
-        ImGui.Spacing();
+        ImGui.EndGroup();
+
+        // ---- Speed ----
+        ImGui.Separator();
+        ImGui.Text("Speed");
+        ImGui.SameLine();
+        ImGui.TextDisabled(c.SpeedChanged ? FormattableString.Invariant($"({c.Speed * 100:0}% of normal)") : "(normal)");
+
+        var speedPct = c.Speed * 100f;
+        ImGui.SetNextItemWidth(260);
+        if (ImGui.SliderFloat("##speed", ref speedPct, AvfxSpeed.MinSpeed * 100f, AvfxSpeed.MaxSpeed * 100f, "%.0f%%",
+                ImGuiSliderFlags.AlwaysClamp | ImGuiSliderFlags.Logarithmic))
+        {
+            c.Speed = MathF.Round(speedPct) / 100f;
+            ColorChanged(0.4);
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("How fast the effect plays. Ctrl+click to type an exact value.");
+
+        foreach (var (label, value) in new[] { ("0.5x", 0.5f), ("0.75x", 0.75f), ("Normal", 1f), ("1.5x", 1.5f), ("2x", 2f), ("3x", 3f) })
+        {
+            ImGui.SameLine();
+            if (ImGui.SmallButton(label))
+            {
+                c.Speed = value;
+                ColorChanged(0);
+            }
+        }
+
+        ImGui.Separator();
+        ImGui.BeginGroup();
         if (ImGui.Button("Same on all slots"))
         {
             foreach (var g in groups.Where(g => g.Type == 0 && g.Group != slot))
             {
-                var copy = c.Clone();
-                copy.Enabled = true;
-                Config.SlotColors[g.Group] = copy;
+                Config.SlotColors[g.Group] = c.Clone();
             }
 
-            c.Enabled = true;
             ColorChanged(0);
         }
 
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Give every slot this color.");
+            ImGui.SetTooltip("Give every slot this color and speed.");
 
         if (ImGui.Button("Copy"))
             copiedColor = c.Clone();
@@ -399,9 +434,7 @@ public sealed class MainWindow : Window
         {
             if (ImGui.Button("Paste") && copiedColor != null)
             {
-                var pasted = copiedColor.Clone();
-                pasted.Enabled = true;
-                Config.SlotColors[slot] = pasted;
+                Config.SlotColors[slot] = copiedColor.Clone();
                 ColorChanged(0);
             }
         }
@@ -416,6 +449,16 @@ public sealed class MainWindow : Window
             ColorChanged(0);
         }
 
+        ImGui.SameLine();
+        if (ImGui.Button("Reset slot"))
+        {
+            Config.SlotColors[slot] = new ColorSettings();
+            ColorChanged(0);
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Original colors and normal speed.");
+
         ImGui.EndGroup();
         SaveColorsWhenReleased();
     }
@@ -427,13 +470,13 @@ public sealed class MainWindow : Window
         var colors  = plugin.Colors;
         if (colored == 0)
         {
-            ImGui.TextDisabled("Colors: original. Click \"Color\" on a slot to recolor it.");
+            ImGui.TextDisabled("All slots play normally. Click \"Customize\" on a slot to change its color or speed.");
         }
         else
         {
-            ImGui.Text($"Colors: {colored} slot{(colored == 1 ? "" : "s")} recolored.");
+            ImGui.Text($"{colored} slot{(colored == 1 ? "" : "s")} customized.");
             ImGui.SameLine();
-            if (ImGui.SmallButton("Clear all colors"))
+            if (ImGui.SmallButton("Reset all customizing"))
                 Ctl.ClearColors();
         }
 
