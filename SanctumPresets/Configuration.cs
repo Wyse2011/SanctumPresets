@@ -70,7 +70,7 @@ public class Preset
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
-    public int Version { get; set; } = 4;
+    public int Version { get; set; } = 5;
 
     /// <summary> Penumbra directory name of the mod being controlled. Empty = auto-detect. </summary>
     public string ModDirectory { get; set; } = string.Empty;
@@ -85,6 +85,9 @@ public class Configuration : IPluginConfiguration
     public List<Preset> Presets { get; set; } = new();
 
     public List<Note> Notes { get; set; } = new();
+
+    /// <summary> Audio files the user added (see Audio/SoundLibrary.cs). </summary>
+    public List<SanctumPresets.Audio.AudioClip> AudioClips { get; set; } = new();
 
     /// <summary> Color for each slot (option group name -> settings). </summary>
     public Dictionary<string, ColorSettings> SlotColors { get; set; } = new();

@@ -24,6 +24,11 @@ public sealed class ColorService : IDisposable
     private readonly Controller controller;
     private readonly Configuration config;
     private readonly string legacyDir;
+    private readonly SanctumPresets.Audio.IGameFiles? game;
+    private readonly string libraryDir;
+    private readonly object soundLock = new();
+    private readonly Dictionary<string, System.Threading.Tasks.Task> building = new();
+    private readonly Dictionary<string, string> buildErrors = new();
     private string? colorDir;
     private List<string> appliedFiles = new();
 
@@ -40,12 +45,26 @@ public sealed class ColorService : IDisposable
     public Func<DateTime> Now { get; set; } = () => DateTime.UtcNow;
 
     /// <param name="legacyDir"> Folder used by 1.2-1.5 (outside Penumbra); emptied on first use. </param>
-    public ColorService(IPenumbra penumbra, Controller controller, Configuration config, string legacyDir)
+    public ColorService(IPenumbra penumbra, Controller controller, Configuration config, string legacyDir,
+        SanctumPresets.Audio.IGameFiles? game = null, string? libraryDir = null)
     {
         this.penumbra   = penumbra;
         this.controller = controller;
         this.config     = config;
         this.legacyDir  = legacyDir;
+        this.game       = game;
+        this.libraryDir = libraryDir ?? legacyDir;
+    }
+
+    /// <summary> True while a sound is being converted in the background. </summary>
+    public bool IsBuildingSound { get { lock (soundLock) return building.Count > 0; } }
+
+    /// <summary> Wait for background sound conversions (used by tests). </summary>
+    public void WaitForSounds()
+    {
+        System.Threading.Tasks.Task[] t;
+        lock (soundLock) t = building.Values.ToArray();
+        System.Threading.Tasks.Task.WaitAll(t);
     }
 
     /// <summary> Where the recolored copies currently live (null until colors are applied once). </summary>
@@ -56,9 +75,12 @@ public sealed class ColorService : IDisposable
     /// <summary> Ask for a re-apply after a short delay (so dragging the color wheel stays smooth). </summary>
     public void MarkDirty(double delaySeconds = 0.25)
     {
-        var due = Now().AddSeconds(delaySeconds);
-        if (due < dueAt)
-            dueAt = due;
+        lock (soundLock)
+        {
+            var due = Now().AddSeconds(delaySeconds);
+            if (due < dueAt)
+                dueAt = due;
+        }
     }
 
     /// <summary> Called every frame. Applies pending changes and re-applies after logins or restarts. </summary>
@@ -165,12 +187,41 @@ public sealed class ColorService : IDisposable
         var keep     = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var problems = new List<string>();
         var weak     = new List<string>();
+        var pending  = new List<string>();
 
         foreach (var (group, options) in current.Value.Settings.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
         {
             var s = config.ColorFor(group);
             if (s == null)
                 continue;
+
+            if (s.SoundId.HasValue)
+            {
+                // A sound replaces the slot's effect: point the slot at the sound-only carrier and the private sound path.
+                var clip = config.AudioClips.FirstOrDefault(c => c.Id == s.SoundId.Value);
+                var slotPath = index.SlotGamePath(group);
+                if (clip == null) { problems.Add($"{group}: its sound was removed from the library"); continue; }
+                if (slotPath == null) { problems.Add($"{group}: couldn't find the slot's game path"); continue; }
+                var key = SanctumPresets.Audio.SoundBuilder.Key(clip, libraryDir, s.SoundLoop, s.SoundVolume);
+                var scdName = $"snd_{key}.scd"; var carrierName = $"snd_{key}.avfx";
+                var scdFile = Path.Combine(colorDir, scdName); var carrierFile = Path.Combine(colorDir, carrierName);
+                keep.Add(scdName); keep.Add(carrierName);
+                string? err;
+                lock (soundLock) buildErrors.TryGetValue(key, out err);
+                if (err != null) { problems.Add($"{clip.Name}: {err}"); continue; }
+                if (File.Exists(scdFile) && File.Exists(carrierFile))
+                {
+                    paths[slotPath] = carrierFile;
+                    paths[SanctumPresets.Audio.SoundBuilder.GamePathFor(key)] = scdFile;
+                }
+                else
+                {
+                    StartSoundBuild(key, clip, s.SoundLoop, s.SoundVolume, scdFile, carrierFile);
+                    pending.Add(clip.Name);
+                }
+
+                continue;
+            }
 
             foreach (var option in options.Where(o => o.Trim() != "---"))
             {
@@ -243,10 +294,41 @@ public sealed class ColorService : IDisposable
 
         if (problems.Count > 0)
             Fail($"Customized {paths.Count} effect(s); problems: {string.Join("; ", problems)}");
+        else if (pending.Count > 0)
+            Ok($"Preparing sound: {string.Join(", ", pending.Distinct())}... it starts playing as soon as it's converted.");
         else if (paths.Count == 0)
             Ok("No effects selected to customize.");
         else
             Ok($"Customized {paths.Count} effect(s)." + (weak.Count > 0 ? $" Limited effect on: {string.Join(", ", weak.Distinct())}" : string.Empty));
+    }
+
+    private void StartSoundBuild(string key, SanctumPresets.Audio.AudioClip clip, bool loop, float volume, string scdFile, string carrierFile)
+    {
+        if (game == null) { lock (soundLock) buildErrors[key] = "sounds need the game's data (not available)"; return; }
+        lock (soundLock)
+        {
+            if (building.ContainsKey(key)) return;
+            var src = Path.Combine(libraryDir, clip.FileName);
+            building[key] = System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    var (scd, carrier) = SanctumPresets.Audio.SoundBuilder.Build(game, src, loop, volume, key);
+                    Directory.CreateDirectory(Path.GetDirectoryName(scdFile)!);
+                    File.WriteAllBytes(scdFile + ".tmp", scd); File.Move(scdFile + ".tmp", scdFile, true);
+                    File.WriteAllBytes(carrierFile + ".tmp", carrier); File.Move(carrierFile + ".tmp", carrierFile, true);
+                }
+                catch (Exception e)
+                {
+                    lock (soundLock) buildErrors[key] = e.Message;
+                }
+                finally
+                {
+                    lock (soundLock) building.Remove(key);
+                    MarkDirty(0);
+                }
+            });
+        }
     }
 
     /// <summary> Remove the colored effects from Penumbra (used when the plugin unloads). </summary>
@@ -285,7 +367,7 @@ public sealed class ColorService : IDisposable
         {
             if (!Directory.Exists(dir))
                 return;
-            foreach (var f in Directory.EnumerateFiles(dir, "*.avfx"))
+            foreach (var f in Directory.EnumerateFiles(dir).Where(f => f.EndsWith(".avfx", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".scd", StringComparison.OrdinalIgnoreCase)))
                 if (!keep.Contains(Path.GetFileName(f)))
                     File.Delete(f);
             if (keep.Count == 0 && !Directory.EnumerateFileSystemEntries(dir).Any())

@@ -80,6 +80,17 @@ public sealed class ModIndex
         Groups[nameEl.GetString()!] = options;
     }
 
+    /// <summary> The game path a slot's effects play on (taken from any of its options), or null. </summary>
+    public string? SlotGamePath(string group)
+    {
+        if (!Groups.TryGetValue(group, out var options)) return null;
+        foreach (var files in options.Values)
+            foreach (var game in files.Keys)
+                if (game.EndsWith(".avfx", StringComparison.OrdinalIgnoreCase))
+                    return game;
+        return null;
+    }
+
     /// <summary> Effect files (.avfx) an option uses: (game path, absolute file path on disk). </summary>
     public List<(string GamePath, string FullPath)> EffectFiles(string group, string option)
     {

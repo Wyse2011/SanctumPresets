@@ -13,6 +13,7 @@
 - **Searchable slot dropdowns.** Type "fog" or "kk" to find an effect among hundreds instead of scrolling.
 - **Named presets.** Save the current setup, then apply, update, rename, reorder or delete it.
 - **Customize each slot.** Give each slot its own color (color wheel, strength, brightness), a **Chroma** full-color cycle with a typed cycle time, and playback speed (25% to 400%), live. The mod's files are never changed.
+- **Sounds.** Add your own `.mp3`, `.ogg` or `.wav` files and play them on a slot, looping or once, with volume. Players near you hear them, and Lightless shares them.
 - **One-click reset.** Set every slot back to `---`.
 - **Automatic redraw** after every change, so you see effects immediately.
 - **Notes.** Mark effects that need fixing ("mist needs to be lowered"), record ideas, and link notes to specific effects, slots and presets. Slots with open notes show a yellow marker.
@@ -107,6 +108,18 @@ How it works: the plugin makes customized copies of the effects you're using in 
 
 Some effects get their color mostly from their textures. Those still take the tint, but may not change as completely; the status line under the slots says which ones.
 
+## Sounds
+
+1. Open the **Sounds** tab and click **Add audio file...** (`.mp3`, `.ogg` or `.wav`). The file is copied into the plugin's folder; rename it if you like.
+2. Click **Customize** on a slot and pick the sound under **Sound**.
+   - **Loop** on: repeats while the slot is on (mono). Off: plays once each time the effect starts (stereo).
+   - **Volume**: 0% to 150% (above 100% can distort loud audio).
+3. The first time, the sound is converted in the background (a few seconds); it starts playing as soon as it's ready.
+
+While a slot has a sound, it plays the sound **instead of** its effect, so use a free slot. Sounds are converted to the game's own format using the game's own sound files as templates (read from your install, nothing from the game is shipped), so they play like any in-game sound effect: people near you hear them at their own **Sound Effects** volume, quieter with distance. Lightless shares them like effects, unless a pair has turned off **Sounds** for you.
+
+Size: about 1.3 MB per minute looping (mono), 2.6 MB per minute playing once (stereo); every pair downloads it once. Only share sounds you have the right to share.
+
 ## Presets
 
 | Button | What it does |
@@ -179,6 +192,8 @@ dotnet build -c Release
 The plugin talks to Penumbra only through its public IPC (API v5) and never edits mod files.
 
 ## Credits and license
+
+- MP3 decoding: [NLayer](https://github.com/naudio/NLayer) (MIT). Ogg Vorbis decoding: [NVorbis](https://github.com/NVorbis/NVorbis) (MIT). Their source and license files are in `SanctumPresets/ThirdParty/`.
 
 - Plugin code: [MIT License](LICENSE).
 - **The Sanctum VFX mod is not part of this repository.** It includes skyboxes by KK, effects by the House VFX author, and effects from the game. Credit and permissions belong to their original authors.

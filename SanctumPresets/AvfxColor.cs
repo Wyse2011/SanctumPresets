@@ -41,9 +41,17 @@ public class ColorSettings
     /// <summary> 0 = original colors, 1 = fully the cycling colors. </summary>
     public float ChromaStrength { get; set; } = 1f;
 
-    /// <summary> True if this slot changes anything: a color, a speed, chroma, or several. </summary>
+    /// <summary> A sound from the library to play instead of this slot's effect (null = none). </summary>
+    public Guid? SoundId { get; set; }
+
+    public bool SoundLoop { get; set; } = true;
+
+    /// <summary> 1 = as recorded. </summary>
+    public float SoundVolume { get; set; } = 1f;
+
+    /// <summary> True if this slot changes anything: a color, a speed, chroma, a sound, or several. </summary>
     public bool IsCustomized
-        => Enabled || Chroma || Math.Abs(Speed - 1f) > 0.001f;
+        => Enabled || Chroma || SoundId.HasValue || Math.Abs(Speed - 1f) > 0.001f;
 
     public bool SpeedChanged
         => Math.Abs(Speed - 1f) > 0.001f;
@@ -65,15 +73,20 @@ public class ColorSettings
             Chroma         = Chroma,
             ChromaSeconds  = ChromaSeconds,
             ChromaStrength = ChromaStrength,
+            SoundId        = SoundId,
+            SoundLoop      = SoundLoop,
+            SoundVolume    = SoundVolume,
             ExcludedSlots  = new(ExcludedSlots),
         };
 
     /// <summary> Stable text used to name generated files, so a change in settings gives a new file. </summary>
     public string Fingerprint()
-        => FormattableString.Invariant($"{(Enabled ? 1 : 0)}|{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}|{Speed:0.###}|{(Chroma ? 1 : 0)}|{ChromaSeconds:0.###}|{ChromaStrength:0.###}");
+        => FormattableString.Invariant($"{(Enabled ? 1 : 0)}|{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}|{Speed:0.###}|{(Chroma ? 1 : 0)}|{ChromaSeconds:0.###}|{ChromaStrength:0.###}|{SoundId}|{SoundLoop}|{SoundVolume:0.###}");
 
     public string Describe()
     {
+        if (SoundId.HasValue)
+            return FormattableString.Invariant($"plays a sound ({(SoundLoop ? "loops" : "plays once")}, volume {SoundVolume * 100:0}%)");
         var color = Enabled
             ? FormattableString.Invariant($"#{ToByte(R):X2}{ToByte(G):X2}{ToByte(B):X2}, {(Mode == ColorMode.Recolor ? "recolor" : "tint")}, strength {Strength * 100:0}%, brightness {Brightness * 100:0}%")
             : "original colors";
