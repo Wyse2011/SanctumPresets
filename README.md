@@ -34,6 +34,7 @@
   | 2 | Gordian necklace | Neck |
   | 3 | Alexandrian bracelets | Wrists |
   | 4 | Gordian ring | Right hand |
+  | 5 (sound) | Alexandrian ring | Left hand |
 
 ## Installation
 
@@ -110,13 +111,20 @@ Some effects get their color mostly from their textures. Those still take the ti
 
 ## Sounds
 
-1. Open the **Sounds** tab and click **Add audio file...** (`.mp3`, `.ogg` or `.wav`). The file is copied into the plugin's folder; rename it if you like.
-2. Click **Customize** on a slot and pick the sound under **Sound**.
+Sounds have their own slot: **5 - Sound (Left Ring)**, on the **Alexandrian ring worn on your left hand**. Slots 1 to 4 stay visual.
+
+1. Open the **Sounds** tab and click **Add audio file...** (`.mp3`, `.ogg` or `.wav`). Rename it if you like.
+2. Click the **Sound** button on slot 5 and pick your sound.
    - **Loop** on: repeats while the slot is on (mono). Off: plays once each time the effect starts (stereo).
    - **Volume**: 0% to 150% (above 100% can distort loud audio).
 3. The first time, the sound is converted in the background (a few seconds); it starts playing as soon as it's ready.
 
-While a slot has a sound, it plays the sound **instead of** its effect, so use a free slot. Sounds are converted to the game's own format using the game's own sound files as templates (read from your install, nothing from the game is shipped), so they play like any in-game sound effect: people near you hear them at their own **Sound Effects** volume, quieter with distance. Lightless shares them like effects, unless a pair has turned off **Sounds** for you.
+Where things are kept:
+
+- **Your audio files** stay in the plugin's own folder (**Open folder** in the Sounds tab), so updating or reimporting the mod never deletes them.
+- **Converted game sounds** go in their own `_SanctumAudio` folder inside the Sanctum VFX mod folder, apart from the recolored effects in `_SanctumColors`. Being inside Penumbra's folder is what lets Lightless share them. If you reimport the mod, they're rebuilt automatically.
+
+Sounds are converted to the game's own format using the game's own sound files as templates (read from your install, nothing from the game is shipped), so they play like any in-game sound effect: people near you hear them at their own **Sound Effects** volume, quieter with distance. Lightless shares them like effects, unless a pair has turned off **Sounds** for you.
 
 Size: about 1.3 MB per minute looping (mono), 2.6 MB per minute playing once (stereo); every pair downloads it once. Only share sounds you have the right to share.
 

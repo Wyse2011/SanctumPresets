@@ -51,7 +51,8 @@ public sealed class Controller
     {
         if (preset.SlotColors != null)
         {
-            config.SlotColors    = Preset.CopyColors(preset.SlotColors)!;
+            config.SlotColors    = Preset.CopyColors(preset.SlotColors)!
+                .ToDictionary(kv => Renamed.TryGetValue(kv.Key, out var n) ? n : kv.Key, kv => kv.Value);
             config.Color.Enabled = false;
         }
         else if (preset.Color != null)
@@ -147,8 +148,9 @@ public sealed class Controller
 
         var failed = new List<string>();
         var applied = 0;
-        foreach (var (group, options) in preset.Settings)
+        foreach (var (savedGroup, options) in preset.Settings)
         {
+            var group = Renamed.TryGetValue(savedGroup, out var now) && !groups.ContainsKey(savedGroup) ? now : savedGroup;
             if (!groups.TryGetValue(group, out var g)) { failed.Add($"{group} (slot no longer exists)"); continue; }
 
             var valid = options.Where(o => g.Options.Contains(o)).ToList();
@@ -266,6 +268,12 @@ public sealed class Controller
             return e.Message;
         }
     }
+
+    /// <summary> Groups renamed in mod updates (old name -> new name), so older presets keep working. </summary>
+    public static readonly Dictionary<string, string> Renamed = new(StringComparer.Ordinal)
+    {
+        ["5 - Housing Tools"] = "6 - Housing Tools",
+    };
 
     public Preset? FindPreset(string name)
         => config.Presets.FirstOrDefault(p => p.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));

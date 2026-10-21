@@ -18,6 +18,10 @@ public sealed class ColorService : IDisposable
 {
     public const string Tag = "SanctumPresets.Color";
     public const string ColorFolderName = "_SanctumColors";
+    public const string AudioFolderName = "_SanctumAudio";   // converted sounds live apart from recolored effects
+
+    /// <summary> Audio-only slots (the mod's "5 - Sound (Left Ring)"). Sounds only play here; effects there are ignored. </summary>
+    public static bool IsSoundSlot(string group) => group.Contains("Sound", StringComparison.OrdinalIgnoreCase);
     public const int Priority = 9999;
 
     private readonly IPenumbra penumbra;
@@ -30,6 +34,7 @@ public sealed class ColorService : IDisposable
     private readonly Dictionary<string, System.Threading.Tasks.Task> building = new();
     private readonly Dictionary<string, string> buildErrors = new();
     private string? colorDir;
+    private string? audioDir;
     private List<string> appliedFiles = new();
 
     private DateTime dueAt = DateTime.MaxValue;
@@ -69,6 +74,9 @@ public sealed class ColorService : IDisposable
 
     /// <summary> Where the recolored copies currently live (null until colors are applied once). </summary>
     public string? ColorDirectory => colorDir;
+
+    /// <summary> Where converted sounds currently live (null until applied once). </summary>
+    public string? AudioDirectory => audioDir;
 
     public bool Active => config.AnyColor;
 
@@ -144,6 +152,7 @@ public sealed class ColorService : IDisposable
             Ok("Colors off: effects use their original colors.");
             appliedFiles = new();
             if (colorDir != null) CleanDir(colorDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            if (audioDir != null) CleanDir(audioDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
             CleanLegacy();
             return;
         }
@@ -156,9 +165,13 @@ public sealed class ColorService : IDisposable
         if (!Directory.Exists(folder)) { Fail($"Mod folder not found: {folder}"); return; }
 
         var newDir = Path.Combine(folder, ColorFolderName);
+        var newAudioDir = Path.Combine(folder, AudioFolderName);
         if (colorDir != null && !string.Equals(colorDir, newDir, StringComparison.OrdinalIgnoreCase))
             CleanDir(colorDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase)); // switched to another mod
+        if (audioDir != null && !string.Equals(audioDir, newAudioDir, StringComparison.OrdinalIgnoreCase))
+            CleanDir(audioDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         colorDir = newDir;
+        audioDir = newAudioDir;
         try
         {
             Directory.CreateDirectory(colorDir);
@@ -188,6 +201,7 @@ public sealed class ColorService : IDisposable
         var problems = new List<string>();
         var weak     = new List<string>();
         var pending  = new List<string>();
+        var keepAudio = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (group, options) in current.Value.Settings.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
         {
@@ -195,8 +209,9 @@ public sealed class ColorService : IDisposable
             if (s == null)
                 continue;
 
-            if (s.SoundId.HasValue)
+            if (IsSoundSlot(group))
             {
+                if (!s.SoundId.HasValue) continue;   // the audio slot only ever plays sounds
                 // A sound replaces the slot's effect: point the slot at the sound-only carrier and the private sound path.
                 var clip = config.AudioClips.FirstOrDefault(c => c.Id == s.SoundId.Value);
                 var slotPath = index.SlotGamePath(group);
@@ -204,8 +219,8 @@ public sealed class ColorService : IDisposable
                 if (slotPath == null) { problems.Add($"{group}: couldn't find the slot's game path"); continue; }
                 var key = SanctumPresets.Audio.SoundBuilder.Key(clip, libraryDir, s.SoundLoop, s.SoundVolume);
                 var scdName = $"snd_{key}.scd"; var carrierName = $"snd_{key}.avfx";
-                var scdFile = Path.Combine(colorDir, scdName); var carrierFile = Path.Combine(colorDir, carrierName);
-                keep.Add(scdName); keep.Add(carrierName);
+                var scdFile = Path.Combine(audioDir, scdName); var carrierFile = Path.Combine(audioDir, carrierName);
+                keepAudio.Add(scdName); keepAudio.Add(carrierName);
                 string? err;
                 lock (soundLock) buildErrors.TryGetValue(key, out err);
                 if (err != null) { problems.Add($"{clip.Name}: {err}"); continue; }
@@ -288,6 +303,7 @@ public sealed class ColorService : IDisposable
         ColoredCount      = paths.Count;
         appliedFiles      = paths.Values.ToList();
         CleanDir(colorDir, keep);
+        CleanDir(audioDir, keepAudio);
         CleanLegacy();
         if (config.AutoRedraw)
             penumbra.RedrawPlayer();

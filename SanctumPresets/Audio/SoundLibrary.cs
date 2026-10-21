@@ -57,6 +57,12 @@ public static class SoundBuilder
         name.Data = System.Text.Encoding.ASCII.GetBytes(GamePathFor(key) + "\0");
         var life = emitter.Child("Life")?.Child("Val");
         if (life != null) life.Data = BitConverter.GetBytes(-1f);   // emitter lives as long as the effect
+        // The carrier's timeline ends its emitter after 175 frames (~5.8 s), which would cut sounds off: never end it.
+        foreach (var tl in tree.All("TmLn"))
+            foreach (var item in tl.All("Item"))
+                foreach (var end in item.All("EdTm"))
+                    if (end.Data is { Length: 4 } && BitConverter.ToInt32(end.Data, 0) > 0)
+                        end.Data = BitConverter.GetBytes(-1);
         return (scd, AvfxTree.Write(tree));
     }
 }

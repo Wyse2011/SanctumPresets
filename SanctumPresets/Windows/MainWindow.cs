@@ -293,13 +293,19 @@ public sealed class MainWindow : Window
             pushed = 4;
         }
 
-        var label = (c is { Chroma: true } ? "Chroma" : "Customize") + (c is { SpeedChanged: true } ? FormattableString.Invariant($" {c.Speed:0.##}x") : string.Empty);
+        var soundSlot = ColorService.IsSoundSlot(slot);
+        var clipName = soundSlot && c?.SoundId is { } sid ? Config.AudioClips.FirstOrDefault(a => a.Id == sid)?.Name : null;
+        var label = soundSlot
+            ? (clipName != null ? (clipName.Length > 12 ? clipName[..12] + "..." : clipName) : "Sound")
+            : (c is { Chroma: true } ? "Chroma" : "Customize") + (c is { SpeedChanged: true } ? FormattableString.Invariant($" {c.Speed:0.##}x") : string.Empty);
         var clicked = ImGui.Button(label + "##customize", new Vector2(110, 0));
         if (pushed > 0)
             ImGui.PopStyleColor(pushed);
 
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip(c != null ? $"{slot}: {c.Describe()}\nClick to change." : $"{slot} plays normally. Click to change its color or speed.");
+            ImGui.SetTooltip(soundSlot
+                ? (clipName != null ? $"{slot}: {clipName} ({(c!.SoundLoop ? "loops" : "plays once")}, volume {c.SoundVolume * 100:0}%)\nClick to change." : $"{slot}: no sound. Click to pick one of your sounds.")
+                : c != null ? $"{slot}: {c.Describe()}\nClick to change." : $"{slot} plays normally. Click to change its color or speed.");
 
         if (clicked)
         {
@@ -315,6 +321,11 @@ public sealed class MainWindow : Window
     private void DrawSlotColorEditor(string slot, string effect)
     {
         var c = Config.SlotColor(slot);
+        if (ColorService.IsSoundSlot(slot))
+        {
+            DrawSoundEditor(slot, c);
+            return;
+        }
 
         ImGui.Text(slot);
         ImGui.SameLine();
@@ -441,37 +452,6 @@ public sealed class MainWindow : Window
             ImGui.TextDisabled("Each viewer's cycle starts when their game loads your effect,\nso two people may see different colors at the same moment.");
         }
 
-        // ---- Sound ----
-        ImGui.Separator();
-        ImGui.Text("Sound");
-        ImGui.SameLine();
-        ImGui.TextDisabled("(plays instead of this slot's effect)");
-        var current = c.SoundId.HasValue ? Config.AudioClips.FirstOrDefault(a => a.Id == c.SoundId.Value) : null;
-        ImGui.SetNextItemWidth(260);
-        using (var combo = ImRaii.Combo("##sound", current?.Name ?? (c.SoundId.HasValue ? "(removed sound)" : "None")))
-        {
-            if (combo)
-            {
-                if (ImGui.Selectable("None", !c.SoundId.HasValue)) { c.SoundId = null; ColorChanged(0); }
-                foreach (var clip in Config.AudioClips.Where(a => !pendingClips.Contains(a.Id)))
-                    if (ImGui.Selectable($"{clip.Name}  ({Length(clip.Seconds)})##{clip.Id}", c.SoundId == clip.Id)) { c.SoundId = clip.Id; ColorChanged(0); }
-                if (Config.AudioClips.Count == 0) ImGui.TextDisabled("Add audio files in the Sounds tab first.");
-            }
-        }
-
-        using (ImRaii.Disabled(!c.SoundId.HasValue))
-        {
-            ImGui.SameLine();
-            var loopS = c.SoundLoop;
-            if (ImGui.Checkbox("Loop", ref loopS)) { c.SoundLoop = loopS; ColorChanged(0); }
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Loop: repeats while the slot is on (plays in mono).\nOff: plays once each time the effect starts (stereo).");
-            var vol = c.SoundVolume * 100f;
-            ImGui.SetNextItemWidth(260);
-            if (ImGui.SliderFloat("Volume", ref vol, 0f, 150f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp)) c.SoundVolume = vol / 100f;
-            if (ImGui.IsItemDeactivatedAfterEdit()) ColorChanged(0);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Above 100% can distort loud audio.\nPlayers hear it at their own Sound Effects volume.");
-        }
-
         // ---- Speed ----
         ImGui.Separator();
         ImGui.Text("Speed");
@@ -548,6 +528,52 @@ public sealed class MainWindow : Window
             ImGui.SetTooltip("Original colors, no chroma, normal speed.");
 
         ImGui.EndGroup();
+        SaveColorsWhenReleased();
+    }
+
+    /// <summary> The audio slot's popup: only sound controls. </summary>
+    private void DrawSoundEditor(string slot, ColorSettings c)
+    {
+        ImGui.Text(slot);
+        ImGui.Text("Sound");
+        ImGui.SameLine();
+        ImGui.TextDisabled("(audio slot: Alexandrian ring, left hand)");
+        var current = c.SoundId.HasValue ? Config.AudioClips.FirstOrDefault(a => a.Id == c.SoundId.Value) : null;
+        ImGui.SetNextItemWidth(260);
+        using (var combo = ImRaii.Combo("##sound", current?.Name ?? (c.SoundId.HasValue ? "(removed sound)" : "None")))
+        {
+            if (combo)
+            {
+                if (ImGui.Selectable("None", !c.SoundId.HasValue)) { c.SoundId = null; ColorChanged(0); }
+                foreach (var clip in Config.AudioClips.Where(a => !pendingClips.Contains(a.Id)))
+                    if (ImGui.Selectable($"{clip.Name}  ({Length(clip.Seconds)})##{clip.Id}", c.SoundId == clip.Id)) { c.SoundId = clip.Id; ColorChanged(0); }
+                if (Config.AudioClips.Count == 0) ImGui.TextDisabled("Add audio files in the Sounds tab first.");
+            }
+        }
+
+        using (ImRaii.Disabled(!c.SoundId.HasValue))
+        {
+            ImGui.SameLine();
+            var loopS = c.SoundLoop;
+            if (ImGui.Checkbox("Loop", ref loopS)) { c.SoundLoop = loopS; ColorChanged(0); }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Loop: repeats while the slot is on (plays in mono).\nOff: plays once each time the effect starts (stereo).");
+            var vol = c.SoundVolume * 100f;
+            ImGui.SetNextItemWidth(260);
+            if (ImGui.SliderFloat("Volume", ref vol, 0f, 150f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp)) c.SoundVolume = vol / 100f;
+            if (ImGui.IsItemDeactivatedAfterEdit()) ColorChanged(0);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Above 100% can distort loud audio.\nPlayers hear it at their own Sound Effects volume.");
+        }
+
+
+        ImGui.Spacing();
+        if (ImGui.Button("No sound"))
+        {
+            Config.SlotColors[slot] = new ColorSettings();
+            ColorChanged(0);
+        }
+
+        ImGui.SameLine();
+        ImGui.TextDisabled("Add or remove audio files in the Sounds tab.");
         SaveColorsWhenReleased();
     }
 
@@ -976,7 +1002,7 @@ public sealed class MainWindow : Window
             {
                 var pcm = SanctumPresets.Audio.AudioDecoder.Decode(System.IO.Path.Combine(plugin.AudioLibraryDir, clip.FileName));
                 clip.Seconds = pcm.Seconds; clip.Channels = pcm.Channels;
-                soundStatus = $"Added \"{clip.Name}\" ({Length(clip.Seconds)}). Pick it in a slot's Customize popup."; soundStatusError = false;
+                soundStatus = $"Added \"{clip.Name}\" ({Length(clip.Seconds)}). Pick it on slot 5 (Sound)."; soundStatusError = false;
             }
             catch (Exception e)
             {
@@ -1000,7 +1026,17 @@ public sealed class MainWindow : Window
                 if (ok && !string.IsNullOrWhiteSpace(path)) AddAudioFile(path);
             });
         ImGui.SameLine();
-        ImGui.TextDisabled("Then pick it in a slot's Customize popup.");
+        if (ImGui.Button("Open folder"))
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = plugin.AudioLibraryDir, UseShellExecute = true }); }
+            catch (Exception e) { soundStatus = $"Couldn't open the folder: {e.Message}"; soundStatusError = true; }
+        }
+
+        ImGui.SameLine();
+        ImGui.TextDisabled("Then pick it on slot 5 (Sound).");
+        ImGui.TextDisabled("Your audio files are kept in the plugin's own folder, so mod updates never delete them.");
+        if (plugin.Colors.AudioDirectory != null)
+            ImGui.TextDisabled($"Converted game sounds: {plugin.Colors.AudioDirectory}");
 
         if (soundStatus.Length > 0)
         {
