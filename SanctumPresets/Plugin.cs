@@ -17,19 +17,6 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IChatGui Chat { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
-    [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
-
-    /// <summary> Reads template files from the player's own game install. </summary>
-    private sealed class GameFiles : SanctumPresets.Audio.IGameFiles
-    {
-        public byte[]? Get(string path)
-        {
-            try { return DataManager.GetFile(path)?.Data; }
-            catch { return null; }
-        }
-    }
-
-    public string AudioLibraryDir { get; }
 
     private const string Command = "/sanctum";
 
@@ -48,10 +35,19 @@ public sealed class Plugin : IDalamudPlugin
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         var penumbra  = new PenumbraBridge(PluginInterface);
         Controller    = new Controller(penumbra, Configuration);
-        AudioLibraryDir = System.IO.Path.Combine(PluginInterface.GetPluginConfigDirectory(), "audio");
-        System.IO.Directory.CreateDirectory(AudioLibraryDir);
         Colors        = new ColorService(penumbra, Controller, Configuration,
-            System.IO.Path.Combine(PluginInterface.GetPluginConfigDirectory(), "colors"), new GameFiles(), AudioLibraryDir);
+            System.IO.Path.Combine(PluginInterface.GetPluginConfigDirectory(), "colors"));
+
+        // Sounds were removed: delete the plugin's copies of audio files from 1.9-1.11.
+        try
+        {
+            var oldAudio = System.IO.Path.Combine(PluginInterface.GetPluginConfigDirectory(), "audio");
+            if (System.IO.Directory.Exists(oldAudio)) System.IO.Directory.Delete(oldAudio, true);
+        }
+        catch (Exception e)
+        {
+            Log.Warning(e, "Couldn't remove the old audio folder");
+        }
         Controller.Colors = Colors;
 
         mainWindow = new MainWindow(this);

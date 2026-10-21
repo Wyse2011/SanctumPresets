@@ -151,6 +151,8 @@ public sealed class Controller
         foreach (var (savedGroup, options) in preset.Settings)
         {
             var group = Renamed.TryGetValue(savedGroup, out var now) && !groups.ContainsKey(savedGroup) ? now : savedGroup;
+            if (Removed.Contains(group) && !groups.ContainsKey(group))
+                continue;
             if (!groups.TryGetValue(group, out var g)) { failed.Add($"{group} (slot no longer exists)"); continue; }
 
             var valid = options.Where(o => g.Options.Contains(o)).ToList();
@@ -272,8 +274,11 @@ public sealed class Controller
     /// <summary> Groups renamed in mod updates (old name -> new name), so older presets keep working. </summary>
     public static readonly Dictionary<string, string> Renamed = new(StringComparer.Ordinal)
     {
-        ["5 - Housing Tools"] = "6 - Housing Tools",
+        ["6 - Housing Tools"] = "5 - Housing Tools",   // briefly numbered 6 while the mod had a sound slot
     };
+
+    /// <summary> Groups removed from the mod; presets that mention them skip them silently. </summary>
+    public static readonly HashSet<string> Removed = new(StringComparer.Ordinal) { "5 - Sound (Left Ring)" };
 
     public Preset? FindPreset(string name)
         => config.Presets.FirstOrDefault(p => p.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));

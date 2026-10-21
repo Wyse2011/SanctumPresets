@@ -18,23 +18,16 @@ public sealed class ColorService : IDisposable
 {
     public const string Tag = "SanctumPresets.Color";
     public const string ColorFolderName = "_SanctumColors";
-    public const string AudioFolderName = "_SanctumAudio";   // converted sounds live apart from recolored effects
-
-    /// <summary> Audio-only slots (the mod's "5 - Sound (Left Ring)"). Sounds only play here; effects there are ignored. </summary>
-    public static bool IsSoundSlot(string group) => group.Contains("Sound", StringComparison.OrdinalIgnoreCase);
+    /// <summary> Folder used by 1.9-1.11 for converted sounds (sounds were removed; leftovers are deleted). </summary>
+    public const string OldAudioFolderName = "_SanctumAudio";
     public const int Priority = 9999;
 
     private readonly IPenumbra penumbra;
     private readonly Controller controller;
     private readonly Configuration config;
     private readonly string legacyDir;
-    private readonly SanctumPresets.Audio.IGameFiles? game;
-    private readonly string libraryDir;
-    private readonly object soundLock = new();
-    private readonly Dictionary<string, System.Threading.Tasks.Task> building = new();
-    private readonly Dictionary<string, string> buildErrors = new();
+    private readonly object dueLock = new();
     private string? colorDir;
-    private string? audioDir;
     private List<string> appliedFiles = new();
 
     private DateTime dueAt = DateTime.MaxValue;
@@ -50,40 +43,24 @@ public sealed class ColorService : IDisposable
     public Func<DateTime> Now { get; set; } = () => DateTime.UtcNow;
 
     /// <param name="legacyDir"> Folder used by 1.2-1.5 (outside Penumbra); emptied on first use. </param>
-    public ColorService(IPenumbra penumbra, Controller controller, Configuration config, string legacyDir,
-        SanctumPresets.Audio.IGameFiles? game = null, string? libraryDir = null)
+    public ColorService(IPenumbra penumbra, Controller controller, Configuration config, string legacyDir)
     {
         this.penumbra   = penumbra;
         this.controller = controller;
         this.config     = config;
         this.legacyDir  = legacyDir;
-        this.game       = game;
-        this.libraryDir = libraryDir ?? legacyDir;
-    }
-
-    /// <summary> True while a sound is being converted in the background. </summary>
-    public bool IsBuildingSound { get { lock (soundLock) return building.Count > 0; } }
-
-    /// <summary> Wait for background sound conversions (used by tests). </summary>
-    public void WaitForSounds()
-    {
-        System.Threading.Tasks.Task[] t;
-        lock (soundLock) t = building.Values.ToArray();
-        System.Threading.Tasks.Task.WaitAll(t);
     }
 
     /// <summary> Where the recolored copies currently live (null until colors are applied once). </summary>
     public string? ColorDirectory => colorDir;
 
-    /// <summary> Where converted sounds currently live (null until applied once). </summary>
-    public string? AudioDirectory => audioDir;
 
     public bool Active => config.AnyColor;
 
     /// <summary> Ask for a re-apply after a short delay (so dragging the color wheel stays smooth). </summary>
     public void MarkDirty(double delaySeconds = 0.25)
     {
-        lock (soundLock)
+        lock (dueLock)
         {
             var due = Now().AddSeconds(delaySeconds);
             if (due < dueAt)
@@ -152,7 +129,6 @@ public sealed class ColorService : IDisposable
             Ok("Colors off: effects use their original colors.");
             appliedFiles = new();
             if (colorDir != null) CleanDir(colorDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
-            if (audioDir != null) CleanDir(audioDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
             CleanLegacy();
             return;
         }
@@ -165,13 +141,19 @@ public sealed class ColorService : IDisposable
         if (!Directory.Exists(folder)) { Fail($"Mod folder not found: {folder}"); return; }
 
         var newDir = Path.Combine(folder, ColorFolderName);
-        var newAudioDir = Path.Combine(folder, AudioFolderName);
+        // Sounds were removed: delete converted sounds left in the mod folder by 1.9-1.11.
+        try
+        {
+            var oldAudio = Path.Combine(folder, OldAudioFolderName);
+            if (Directory.Exists(oldAudio)) Directory.Delete(oldAudio, true);
+        }
+        catch
+        {
+            // a file in use is removed next time
+        }
         if (colorDir != null && !string.Equals(colorDir, newDir, StringComparison.OrdinalIgnoreCase))
             CleanDir(colorDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase)); // switched to another mod
-        if (audioDir != null && !string.Equals(audioDir, newAudioDir, StringComparison.OrdinalIgnoreCase))
-            CleanDir(audioDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         colorDir = newDir;
-        audioDir = newAudioDir;
         try
         {
             Directory.CreateDirectory(colorDir);
@@ -200,43 +182,12 @@ public sealed class ColorService : IDisposable
         var keep     = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var problems = new List<string>();
         var weak     = new List<string>();
-        var pending  = new List<string>();
-        var keepAudio = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (group, options) in current.Value.Settings.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
         {
             var s = config.ColorFor(group);
             if (s == null)
                 continue;
-
-            if (IsSoundSlot(group))
-            {
-                if (!s.SoundId.HasValue) continue;   // the audio slot only ever plays sounds
-                // A sound replaces the slot's effect: point the slot at the sound-only carrier and the private sound path.
-                var clip = config.AudioClips.FirstOrDefault(c => c.Id == s.SoundId.Value);
-                var slotPath = index.SlotGamePath(group);
-                if (clip == null) { problems.Add($"{group}: its sound was removed from the library"); continue; }
-                if (slotPath == null) { problems.Add($"{group}: couldn't find the slot's game path"); continue; }
-                var key = SanctumPresets.Audio.SoundBuilder.Key(clip, libraryDir, s.SoundLoop, s.SoundVolume);
-                var scdName = $"snd_{key}.scd"; var carrierName = $"snd_{key}.avfx";
-                var scdFile = Path.Combine(audioDir, scdName); var carrierFile = Path.Combine(audioDir, carrierName);
-                keepAudio.Add(scdName); keepAudio.Add(carrierName);
-                string? err;
-                lock (soundLock) buildErrors.TryGetValue(key, out err);
-                if (err != null) { problems.Add($"{clip.Name}: {err}"); continue; }
-                if (File.Exists(scdFile) && File.Exists(carrierFile))
-                {
-                    paths[slotPath] = carrierFile;
-                    paths[SanctumPresets.Audio.SoundBuilder.GamePathFor(key)] = scdFile;
-                }
-                else
-                {
-                    StartSoundBuild(key, clip, s.SoundLoop, s.SoundVolume, scdFile, carrierFile);
-                    pending.Add(clip.Name);
-                }
-
-                continue;
-            }
 
             foreach (var option in options.Where(o => o.Trim() != "---"))
             {
@@ -250,6 +201,8 @@ public sealed class ColorService : IDisposable
                         if (!File.Exists(target))
                         {
                             var data = bytes;
+                            if (s.Moved)
+                                data = AvfxTransform.Apply(data, s.Size, s.Height, s.Forward).Data;
                             if (s.Enabled && !s.Chroma)
                             {
                                 var result = AvfxColor.Apply(data, s);
@@ -303,48 +256,16 @@ public sealed class ColorService : IDisposable
         ColoredCount      = paths.Count;
         appliedFiles      = paths.Values.ToList();
         CleanDir(colorDir, keep);
-        CleanDir(audioDir, keepAudio);
         CleanLegacy();
         if (config.AutoRedraw)
             penumbra.RedrawPlayer();
 
         if (problems.Count > 0)
             Fail($"Customized {paths.Count} effect(s); problems: {string.Join("; ", problems)}");
-        else if (pending.Count > 0)
-            Ok($"Preparing sound: {string.Join(", ", pending.Distinct())}... it starts playing as soon as it's converted.");
         else if (paths.Count == 0)
             Ok("No effects selected to customize.");
         else
             Ok($"Customized {paths.Count} effect(s)." + (weak.Count > 0 ? $" Limited effect on: {string.Join(", ", weak.Distinct())}" : string.Empty));
-    }
-
-    private void StartSoundBuild(string key, SanctumPresets.Audio.AudioClip clip, bool loop, float volume, string scdFile, string carrierFile)
-    {
-        if (game == null) { lock (soundLock) buildErrors[key] = "sounds need the game's data (not available)"; return; }
-        lock (soundLock)
-        {
-            if (building.ContainsKey(key)) return;
-            var src = Path.Combine(libraryDir, clip.FileName);
-            building[key] = System.Threading.Tasks.Task.Run(() =>
-            {
-                try
-                {
-                    var (scd, carrier) = SanctumPresets.Audio.SoundBuilder.Build(game, src, loop, volume, key);
-                    Directory.CreateDirectory(Path.GetDirectoryName(scdFile)!);
-                    File.WriteAllBytes(scdFile + ".tmp", scd); File.Move(scdFile + ".tmp", scdFile, true);
-                    File.WriteAllBytes(carrierFile + ".tmp", carrier); File.Move(carrierFile + ".tmp", carrierFile, true);
-                }
-                catch (Exception e)
-                {
-                    lock (soundLock) buildErrors[key] = e.Message;
-                }
-                finally
-                {
-                    lock (soundLock) building.Remove(key);
-                    MarkDirty(0);
-                }
-            });
-        }
     }
 
     /// <summary> Remove the colored effects from Penumbra (used when the plugin unloads). </summary>

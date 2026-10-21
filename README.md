@@ -12,8 +12,7 @@
 
 - **Searchable slot dropdowns.** Type "fog" or "kk" to find an effect among hundreds instead of scrolling.
 - **Named presets.** Save the current setup, then apply, update, rename, reorder or delete it.
-- **Customize each slot.** Give each slot its own color (color wheel, strength, brightness), a **Chroma** full-color cycle with a typed cycle time, and playback speed (25% to 400%), live. The mod's files are never changed.
-- **Sounds.** Add your own `.mp3`, `.ogg` or `.wav` files and play them on a slot, looping or once, with volume. Players near you hear them, and Lightless shares them.
+- **Customize each slot.** Give each slot its own color (color wheel, strength, brightness), a **Chroma** full-color cycle with a typed cycle time, size and position, and playback speed (25% to 400%), live. The mod's files are never changed.
 - **One-click reset.** Set every slot back to `---`.
 - **Automatic redraw** after every change, so you see effects immediately.
 - **Notes.** Mark effects that need fixing ("mist needs to be lowered"), record ideas, and link notes to specific effects, slots and presets. Slots with open notes show a yellow marker.
@@ -34,7 +33,6 @@
   | 2 | Gordian necklace | Neck |
   | 3 | Alexandrian bracelets | Wrists |
   | 4 | Gordian ring | Right hand |
-  | 5 (sound) | Alexandrian ring | Left hand |
 
 ## Installation
 
@@ -85,6 +83,17 @@ Pick **White** to drain the color out of an effect (ghostly fire, silver mist).
 
 The color cycle is written into the effect itself, so the game animates it on its own and everyone who sees you through Lightless sees it cycle too, with nothing extra being sent while it runs. Each viewer's cycle starts when their game loads your effect, so two people may see different colors at the same moment. Chroma replaces the slot's static color while it's on; Brightness and Speed still apply, and the typed cycle time stays exact whatever the speed.
 
+**Size & position**
+
+| Control | What it does |
+|---|---|
+| **Size** | 10% to 1000%. Makes the whole effect bigger or smaller. For skies, bigger also pushes the sky further back. |
+| **Height** | Raise (+) or lower (-) the effect, in yalms. |
+| **Forward / back** | Move the effect forward (+) or back (-), in yalms. |
+| **Reset size & position** | Back to how the effect was made. |
+
+Ctrl+click any slider to type an exact number (including values beyond the slider). These work relative to each effect's own settings, so an "at feet" floor stays at your feet at height 0.
+
 **Speed**
 
 | Control | What it does |
@@ -101,32 +110,13 @@ Speed changes the whole effect consistently: animations, fades, texture scrollin
 | **Same on all slots** | Gives every slot this color and speed. |
 | **Copy / Paste** | Copy a slot's color and speed and paste them on another slot. |
 | **Original colors** | Puts this slot's colors back to normal (keeps its speed). |
-| **Reset slot** | Original colors, no chroma, normal speed. |
+| **Reset slot** | Original colors, no chroma, normal size, position and speed. |
 
 Customizing belongs to the **slot**: pick a different effect in that slot and it gets the same color and speed. **Reset all customizing** (under the slots) puts every slot back to normal. Presets save every slot's color and speed. Presets saved in 1.2 (one color for everything) still work.
 
 How it works: the plugin makes customized copies of the effects you're using in a `_SanctumColors` folder inside the Sanctum VFX mod folder, and asks Penumbra to use them for your character. The mod's own files are never changed; the plugin only adds and clears that one folder. Customizing comes back automatically after restarting the game or reimporting the mod.
 
 Some effects get their color mostly from their textures. Those still take the tint, but may not change as completely; the status line under the slots says which ones.
-
-## Sounds
-
-Sounds have their own slot: **5 - Sound (Left Ring)**, on the **Alexandrian ring worn on your left hand**. Slots 1 to 4 stay visual.
-
-1. Open the **Sounds** tab and click **Add audio file...** (`.mp3`, `.ogg` or `.wav`). Rename it if you like.
-2. Click the **Sound** button on slot 5 and pick your sound.
-   - **Loop** on: repeats while the slot is on (mono). Off: plays once each time the effect starts (stereo).
-   - **Volume**: 0% to 150% (above 100% can distort loud audio).
-3. The first time, the sound is converted in the background (a few seconds); it starts playing as soon as it's ready.
-
-Where things are kept:
-
-- **Your audio files** stay in the plugin's own folder (**Open folder** in the Sounds tab), so updating or reimporting the mod never deletes them.
-- **Converted game sounds** go in their own `_SanctumAudio` folder inside the Sanctum VFX mod folder, apart from the recolored effects in `_SanctumColors`. Being inside Penumbra's folder is what lets Lightless share them. If you reimport the mod, they're rebuilt automatically.
-
-Sounds are converted to the game's own format using the game's own sound files as templates (read from your install, nothing from the game is shipped), so they play like any in-game sound effect: people near you hear them at their own **Sound Effects** volume, quieter with distance. Lightless shares them like effects, unless a pair has turned off **Sounds** for you.
-
-Size: about 1.3 MB per minute looping (mono), 2.6 MB per minute playing once (stereo); every pair downloads it once. Only share sounds you have the right to share.
 
 ## Presets
 
@@ -201,7 +191,6 @@ The plugin talks to Penumbra only through its public IPC (API v5) and never edit
 
 ## Credits and license
 
-- MP3 decoding: [NLayer](https://github.com/naudio/NLayer) (MIT). Ogg Vorbis decoding: [NVorbis](https://github.com/NVorbis/NVorbis) (MIT). Their source and license files are in `SanctumPresets/ThirdParty/`.
 
 - Plugin code: [MIT License](LICENSE).
 - **The Sanctum VFX mod is not part of this repository.** It includes skyboxes by KK, effects by the House VFX author, and effects from the game. Credit and permissions belong to their original authors.

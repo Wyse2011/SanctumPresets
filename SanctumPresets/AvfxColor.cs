@@ -41,17 +41,21 @@ public class ColorSettings
     /// <summary> 0 = original colors, 1 = fully the cycling colors. </summary>
     public float ChromaStrength { get; set; } = 1f;
 
-    /// <summary> A sound from the library to play instead of this slot's effect (null = none). </summary>
-    public Guid? SoundId { get; set; }
+    /// <summary> Size multiplier for the whole effect (1 = as made). </summary>
+    public float Size { get; set; } = 1f;
 
-    public bool SoundLoop { get; set; } = true;
+    /// <summary> Raise (+) or lower (-) the effect, in yalms. </summary>
+    public float Height { get; set; }
 
-    /// <summary> 1 = as recorded. </summary>
-    public float SoundVolume { get; set; } = 1f;
+    /// <summary> Move the effect forward (+) or back (-), in yalms. </summary>
+    public float Forward { get; set; }
 
-    /// <summary> True if this slot changes anything: a color, a speed, chroma, a sound, or several. </summary>
+    public bool Moved
+        => Math.Abs(Size - 1f) > 0.001f || Math.Abs(Height) > 0.001f || Math.Abs(Forward) > 0.001f;
+
+    /// <summary> True if this slot changes anything: a color, a speed, chroma, size/position, or several. </summary>
     public bool IsCustomized
-        => Enabled || Chroma || SoundId.HasValue || Math.Abs(Speed - 1f) > 0.001f;
+        => Enabled || Chroma || Moved || Math.Abs(Speed - 1f) > 0.001f;
 
     public bool SpeedChanged
         => Math.Abs(Speed - 1f) > 0.001f;
@@ -73,20 +77,18 @@ public class ColorSettings
             Chroma         = Chroma,
             ChromaSeconds  = ChromaSeconds,
             ChromaStrength = ChromaStrength,
-            SoundId        = SoundId,
-            SoundLoop      = SoundLoop,
-            SoundVolume    = SoundVolume,
+            Size           = Size,
+            Height         = Height,
+            Forward        = Forward,
             ExcludedSlots  = new(ExcludedSlots),
         };
 
     /// <summary> Stable text used to name generated files, so a change in settings gives a new file. </summary>
     public string Fingerprint()
-        => FormattableString.Invariant($"{(Enabled ? 1 : 0)}|{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}|{Speed:0.###}|{(Chroma ? 1 : 0)}|{ChromaSeconds:0.###}|{ChromaStrength:0.###}|{SoundId}|{SoundLoop}|{SoundVolume:0.###}");
+        => FormattableString.Invariant($"{(Enabled ? 1 : 0)}|{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}|{Speed:0.###}|{(Chroma ? 1 : 0)}|{ChromaSeconds:0.###}|{ChromaStrength:0.###}|{Size:0.###}|{Height:0.###}|{Forward:0.###}");
 
     public string Describe()
     {
-        if (SoundId.HasValue)
-            return FormattableString.Invariant($"plays a sound ({(SoundLoop ? "loops" : "plays once")}, volume {SoundVolume * 100:0}%)");
         var color = Enabled
             ? FormattableString.Invariant($"#{ToByte(R):X2}{ToByte(G):X2}{ToByte(B):X2}, {(Mode == ColorMode.Recolor ? "recolor" : "tint")}, strength {Strength * 100:0}%, brightness {Brightness * 100:0}%")
             : "original colors";
@@ -94,6 +96,10 @@ public class ColorSettings
             color = FormattableString.Invariant($"chroma (full color cycle every {ChromaSeconds:0.##}s, strength {ChromaStrength * 100:0}%)")
                   + (Enabled ? FormattableString.Invariant($", brightness {Brightness * 100:0}%") : string.Empty);
         var speed = SpeedChanged ? FormattableString.Invariant($", speed {Speed * 100:0}%") : string.Empty;
+        if (Moved)
+            speed += (Math.Abs(Size - 1f) > 0.001f ? FormattableString.Invariant($", size {Size * 100:0}%") : string.Empty)
+                   + (Math.Abs(Height) > 0.001f ? FormattableString.Invariant($", height {Height:+0.##;-0.##}") : string.Empty)
+                   + (Math.Abs(Forward) > 0.001f ? FormattableString.Invariant($", forward {Forward:+0.##;-0.##}") : string.Empty);
         return color + speed + (ExcludedSlots.Count > 0 ? $", not on: {string.Join(", ", ExcludedSlots)}" : string.Empty);
     }
 
