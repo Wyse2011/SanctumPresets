@@ -32,9 +32,18 @@ public class ColorSettings
     /// <summary> Playback speed: 1 = normal, 0.5 = half speed, 2 = double speed. </summary>
     public float Speed { get; set; } = 1f;
 
-    /// <summary> True if this slot changes anything: a color, a speed, or both. </summary>
+    /// <summary> Chroma: cycle through every color in a loop baked into the effect. </summary>
+    public bool Chroma { get; set; }
+
+    /// <summary> Seconds for one full trip around the color wheel. </summary>
+    public float ChromaSeconds { get; set; } = 10f;
+
+    /// <summary> 0 = original colors, 1 = fully the cycling colors. </summary>
+    public float ChromaStrength { get; set; } = 1f;
+
+    /// <summary> True if this slot changes anything: a color, a speed, chroma, or several. </summary>
     public bool IsCustomized
-        => Enabled || Math.Abs(Speed - 1f) > 0.001f;
+        => Enabled || Chroma || Math.Abs(Speed - 1f) > 0.001f;
 
     public bool SpeedChanged
         => Math.Abs(Speed - 1f) > 0.001f;
@@ -52,19 +61,25 @@ public class ColorSettings
             Mode          = Mode,
             Strength      = Strength,
             Brightness    = Brightness,
-            Speed         = Speed,
-            ExcludedSlots = new(ExcludedSlots),
+            Speed          = Speed,
+            Chroma         = Chroma,
+            ChromaSeconds  = ChromaSeconds,
+            ChromaStrength = ChromaStrength,
+            ExcludedSlots  = new(ExcludedSlots),
         };
 
     /// <summary> Stable text used to name generated files, so a change in settings gives a new file. </summary>
     public string Fingerprint()
-        => FormattableString.Invariant($"{(Enabled ? 1 : 0)}|{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}|{Speed:0.###}");
+        => FormattableString.Invariant($"{(Enabled ? 1 : 0)}|{(int)Mode}|{R:0.###}|{G:0.###}|{B:0.###}|{Strength:0.###}|{Brightness:0.###}|{Speed:0.###}|{(Chroma ? 1 : 0)}|{ChromaSeconds:0.###}|{ChromaStrength:0.###}");
 
     public string Describe()
     {
         var color = Enabled
             ? FormattableString.Invariant($"#{ToByte(R):X2}{ToByte(G):X2}{ToByte(B):X2}, {(Mode == ColorMode.Recolor ? "recolor" : "tint")}, strength {Strength * 100:0}%, brightness {Brightness * 100:0}%")
             : "original colors";
+        if (Chroma)
+            color = FormattableString.Invariant($"chroma (full color cycle every {ChromaSeconds:0.##}s, strength {ChromaStrength * 100:0}%)")
+                  + (Enabled ? FormattableString.Invariant($", brightness {Brightness * 100:0}%") : string.Empty);
         var speed = SpeedChanged ? FormattableString.Invariant($", speed {Speed * 100:0}%") : string.Empty;
         return color + speed + (ExcludedSlots.Count > 0 ? $", not on: {string.Join(", ", ExcludedSlots)}" : string.Empty);
     }

@@ -12,7 +12,7 @@
 
 - **Searchable slot dropdowns.** Type "fog" or "kk" to find an effect among hundreds instead of scrolling.
 - **Named presets.** Save the current setup, then apply, update, rename, reorder or delete it.
-- **Customize each slot.** Give each slot its own color (color wheel, strength, brightness) and playback speed (25% to 400%), live. The mod's files are never changed.
+- **Customize each slot.** Give each slot its own color (color wheel, strength, brightness), a **Chroma** full-color cycle with a typed cycle time, and playback speed (25% to 400%), live. The mod's files are never changed.
 - **One-click reset.** Set every slot back to `---`.
 - **Automatic redraw** after every change, so you see effects immediately.
 - **Notes.** Mark effects that need fixing ("mist needs to be lowered"), record ideas, and link notes to specific effects, slots and presets. Slots with open notes show a yellow marker.
@@ -73,6 +73,16 @@ Each slot has a **Customize** button next to **+ Note**. Click it to open that s
 
 Pick **White** to drain the color out of an effect (ghostly fire, silver mist).
 
+**Chroma**
+
+| Control | What it does |
+|---|---|
+| **Chroma** | The effect cycles smoothly through every color (red, orange, yellow, green, cyan, blue, violet, magenta, back to red), forever. |
+| **Seconds per cycle** | Type how long one trip around the color wheel takes, from 0.5 seconds to about 36 minutes, then press Enter. Quick buttons: 2s, 5s, 10s, 30s, 60s. |
+| **Chroma strength** | 0% = original colors, 100% = fully the cycling colors. |
+
+The color cycle is written into the effect itself, so the game animates it on its own and everyone who sees you through Lightless sees it cycle too, with nothing extra being sent while it runs. Each viewer's cycle starts when their game loads your effect, so two people may see different colors at the same moment. Chroma replaces the slot's static color while it's on; Brightness and Speed still apply, and the typed cycle time stays exact whatever the speed.
+
 **Speed**
 
 | Control | What it does |
@@ -89,7 +99,7 @@ Speed changes the whole effect consistently: animations, fades, texture scrollin
 | **Same on all slots** | Gives every slot this color and speed. |
 | **Copy / Paste** | Copy a slot's color and speed and paste them on another slot. |
 | **Original colors** | Puts this slot's colors back to normal (keeps its speed). |
-| **Reset slot** | Original colors and normal speed. |
+| **Reset slot** | Original colors, no chroma, normal speed. |
 
 Customizing belongs to the **slot**: pick a different effect in that slot and it gets the same color and speed. **Reset all customizing** (under the slots) puts every slot back to normal. Presets save every slot's color and speed. Presets saved in 1.2 (one color for everything) still work.
 

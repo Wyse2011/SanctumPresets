@@ -230,7 +230,10 @@ public sealed class Controller
         var cur = Capture();
         if (cur == null)
             return new();
-        return cur.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+        // Only single-choice groups are effect slots (tick-box groups like "Housing Tools" are not effects).
+        var mod = ResolveMod();
+        var singles = mod == null ? new HashSet<string>() : GetGroups(mod.Value.Directory).Where(g => g.Type == 0).Select(g => g.Group).ToHashSet();
+        return cur.Where(kv => singles.Contains(kv.Key)).OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
             .SelectMany(kv => kv.Value.Where(o => o.Trim() != "---").Select(o => (kv.Key, o)))
             .ToList();
     }

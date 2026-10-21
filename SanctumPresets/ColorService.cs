@@ -184,16 +184,29 @@ public sealed class ColorService : IDisposable
                         if (!File.Exists(target))
                         {
                             var data = bytes;
-                            if (s.Enabled)
+                            if (s.Enabled && !s.Chroma)
                             {
                                 var result = AvfxColor.Apply(data, s);
                                 data = result.Data;
                                 if (s.Mode == ColorMode.Recolor && result.LayerColorsChanged == 0)
                                     weak.Add(option);
                             }
+                            else if (s.Enabled && s.Chroma && Math.Abs(s.Brightness - 1f) > 0.001f)
+                            {
+                                // Chroma replaces the static color; only the brightness setting still applies.
+                                data = AvfxColor.Apply(data, new ColorSettings { Enabled = true, Mode = ColorMode.Tint, Strength = 0f, Brightness = s.Brightness }).Data;
+                            }
 
                             if (s.SpeedChanged)
                                 data = AvfxSpeed.Apply(data, s.Speed).Data;
+
+                            // Last, so the typed cycle time is exact regardless of the speed setting.
+                            if (s.Chroma)
+                            {
+                                var chroma = AvfxChroma.Apply(data, s.ChromaSeconds, s.ChromaStrength);
+                                data = chroma.Data;
+                                if (chroma.CurvesChanged == 0) weak.Add(option + " (no color curve for chroma)");
+                            }
                             File.WriteAllBytes(target, data);
                         }
 
@@ -233,7 +246,7 @@ public sealed class ColorService : IDisposable
         else if (paths.Count == 0)
             Ok("No effects selected to customize.");
         else
-            Ok($"Customized {paths.Count} effect(s)." + (weak.Count > 0 ? $" Only tinted (no layer colors to shift): {string.Join(", ", weak.Distinct())}" : string.Empty));
+            Ok($"Customized {paths.Count} effect(s)." + (weak.Count > 0 ? $" Limited effect on: {string.Join(", ", weak.Distinct())}" : string.Empty));
     }
 
     /// <summary> Remove the colored effects from Penumbra (used when the plugin unloads). </summary>

@@ -287,7 +287,7 @@ public sealed class MainWindow : Window
             pushed = 4;
         }
 
-        var label = c is { SpeedChanged: true } ? FormattableString.Invariant($"Customize {c.Speed:0.##}x") : "Customize";
+        var label = (c is { Chroma: true } ? "Chroma" : "Customize") + (c is { SpeedChanged: true } ? FormattableString.Invariant($" {c.Speed:0.##}x") : string.Empty);
         var clicked = ImGui.Button(label + "##customize", new Vector2(110, 0));
         if (pushed > 0)
             ImGui.PopStyleColor(pushed);
@@ -384,6 +384,57 @@ public sealed class MainWindow : Window
 
         ImGui.EndGroup();
 
+        // ---- Chroma ----
+        ImGui.Separator();
+        var chroma = c.Chroma;
+        if (ImGui.Checkbox("Chroma (cycle through every color)", ref chroma))
+        {
+            c.Chroma = chroma;
+            ColorChanged(0);
+        }
+
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("The color cycle is written into the effect, so the game animates it by itself\nand everyone who sees you (through Lightless) sees it cycle too.");
+
+        using (ImRaii.Disabled(!c.Chroma))
+        {
+            var secs = c.ChromaSeconds;
+            ImGui.SetNextItemWidth(120);
+            ImGui.InputFloat("seconds per cycle##chromasecs", ref secs, 0f, 0f, "%.2f");
+            if (ImGui.IsItemDeactivatedAfterEdit())
+            {
+                c.ChromaSeconds = Math.Clamp(secs, AvfxChroma.MinSeconds, AvfxChroma.MaxSeconds);
+                ColorChanged(0);
+            }
+            else if (ImGui.IsItemActive())
+            {
+                c.ChromaSeconds = Math.Clamp(secs, AvfxChroma.MinSeconds, AvfxChroma.MaxSeconds);
+            }
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip(FormattableString.Invariant($"Type any time from {AvfxChroma.MinSeconds:0.#} to {AvfxChroma.MaxSeconds:0} seconds, then press Enter."));
+
+            foreach (var (label, value) in new[] { ("2s", 2f), ("5s", 5f), ("10s", 10f), ("30s", 30f), ("60s", 60f) })
+            {
+                ImGui.SameLine();
+                if (ImGui.SmallButton(label + "##chroma"))
+                {
+                    c.ChromaSeconds = value;
+                    ColorChanged(0);
+                }
+            }
+
+            var cs = c.ChromaStrength * 100f;
+            ImGui.SetNextItemWidth(260);
+            if (ImGui.SliderFloat("Chroma strength", ref cs, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
+            {
+                c.ChromaStrength = cs / 100f;
+                ColorChanged(0.4);
+            }
+
+            ImGui.TextDisabled("Each viewer's cycle starts when their game loads your effect,\nso two people may see different colors at the same moment.");
+        }
+
         // ---- Speed ----
         ImGui.Separator();
         ImGui.Text("Speed");
@@ -457,7 +508,7 @@ public sealed class MainWindow : Window
         }
 
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Original colors and normal speed.");
+            ImGui.SetTooltip("Original colors, no chroma, normal speed.");
 
         ImGui.EndGroup();
         SaveColorsWhenReleased();
