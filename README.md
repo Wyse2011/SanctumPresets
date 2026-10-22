@@ -24,15 +24,21 @@
 
 - [XIVLauncher / Dalamud](https://goatcorp.github.io/)
 - [Penumbra](https://github.com/xivdev/Penumbra)
-- The **Sanctum VFX 4-Slot** mod installed in Penumbra (not included here)
+- The **Sanctum VFX** mod installed in Penumbra (not included here)
 - The accessories the mod uses, worn on your character:
 
-  | Slot | Item | Worn on |
-  |---|---|---|
-  | 1 | Alexandrian earrings | Ears |
-  | 2 | Gordian necklace | Neck |
-  | 3 | Alexandrian bracelets | Wrists |
-  | 4 | Gordian ring | Right hand |
+  | Slot | Wear this (invisible) | Where |
+|---|---|---|
+| 1 | The Emperor's New Earrings | Ears |
+| 2 | The Emperor's New Necklace | Neck |
+| 3 | The Emperor's New Bracelet | Wrists |
+| 4 | The Emperor's New Ring | Right hand |
+| 5 | The Emperor's New Ring (a second one) | Left hand |
+| 6 | The Emperor's New Gloves | Hands |
+| 7 | The Emperor's New Breeches | Legs |
+| 8 | The Emperor's New Boots | Feet |
+
+All of them are invisible glamour items sold by Goberin (Western Thanalan) and Tataroga (Mor Dhona). Group 9 of the mod is Housing Tools.
 
 ## Installation
 

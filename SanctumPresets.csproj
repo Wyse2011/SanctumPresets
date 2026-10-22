@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <!-- The release workflow overrides this with the release tag (v1.2.0 -> 1.2.0.0). -->
+    <Version>1.14.0.0</Version>
+    <Author>Sanctum</Author>
+    <Name>Sanctum Presets</Name>
+    <Punchline>Named presets and notes for the Sanctum VFX Penumbra mod.</Punchline>
+    <Description>Pick effects for each Sanctum VFX slot with searchable dropdowns, recolor each slot with its own color, save setups as named presets, switch looks with one click or /sanctum &lt;preset&gt;, and keep notes linked to effects and presets that export to a .txt file. Requires Penumbra and the Sanctum VFX 4-Slot mod.</Description>
+    <Tags>penumbra;vfx;presets;housing</Tags>
+  </PropertyGroup>
+</Project>
