@@ -34,11 +34,10 @@
 | 3 | The Emperor's New Bracelet | Wrists |
 | 4 | The Emperor's New Ring | Right hand |
 | 5 | The Emperor's New Ring (a second one) | Left hand |
-| 6 | The Emperor's New Gloves | Hands |
+| 6 | The Emperor's New Hat | Head |
 | 7 | The Emperor's New Breeches | Legs |
-| 8 | The Emperor's New Boots | Feet |
 
-All of them are invisible glamour items sold by Goberin (Western Thanalan) and Tataroga (Mor Dhona). Group 9 of the mod is Housing Tools.
+All of them are invisible glamour items sold by Goberin (Western Thanalan) and Tataroga (Mor Dhona). Group 8 of the mod is Housing Tools. The game doesn't play effects on gloves or boots, so those slots aren't offered.
 
 ## Installation
 

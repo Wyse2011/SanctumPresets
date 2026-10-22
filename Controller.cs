@@ -276,12 +276,18 @@ public sealed class Controller
     /// <summary> Groups renamed in mod updates (old name -> new name), so older presets keep working. </summary>
     public static readonly Dictionary<string, string> Renamed = new(StringComparer.Ordinal)
     {
-        ["5 - Housing Tools"] = "9 - Housing Tools",   // mod 3.0 has eight effect slots
-        ["6 - Housing Tools"] = "9 - Housing Tools",   // briefly numbered 6 while the mod had a sound slot
+        ["5 - Housing Tools"] = "8 - Housing Tools",   // mod 3.1 has seven effect slots
+        ["6 - Housing Tools"] = "8 - Housing Tools",   // briefly numbered 6 while the mod had a sound slot
+        ["9 - Housing Tools"] = "8 - Housing Tools",   // mod 3.0 (hands and feet slots, which the game doesn't play)
     };
 
     /// <summary> Groups removed from the mod; presets that mention them skip them silently. </summary>
-    public static readonly HashSet<string> Removed = new(StringComparer.Ordinal) { "5 - Sound (Left Ring)" };
+    public static readonly HashSet<string> Removed = new(StringComparer.Ordinal)
+    {
+        "5 - Sound (Left Ring)",
+        "6 - VFX (Hands)",   // the game doesn't play effects on gloves
+        "8 - VFX (Feet)",    // or on boots
+    };
 
     public Preset? FindPreset(string name)
         => config.Presets.FirstOrDefault(p => p.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
