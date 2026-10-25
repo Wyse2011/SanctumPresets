@@ -4,7 +4,7 @@
 [![Build](https://github.com/Wyse2011/SanctumPresets/actions/workflows/build.yml/badge.svg)](https://github.com/Wyse2011/SanctumPresets/actions/workflows/build.yml)
 ![Dalamud API 15](https://img.shields.io/badge/Dalamud%20API-15-blue)
 
-**Remote control for the Sanctum VFX mod.** Pick the effect for each slot, give each slot its own color and speed, save the look as a named preset, and switch between looks with one click or a chat command. Keep notes on effects that need fixing and ideas for new looks, then export them to a text file.
+**Remote control for the Sanctum VFX 4-Slot mod.** Pick the effect for each slot, give each slot its own color and speed, save the look as a named preset, and switch between looks with one click or a chat command. Keep notes on effects that need fixing and ideas for new looks, then export them to a text file.
 
 ---
 
@@ -27,17 +27,15 @@
 - The **Sanctum VFX** mod installed in Penumbra (not included here)
 - The accessories the mod uses, worn on your character:
 
-  | Slot | Wear this (invisible) | Where |
+  | Slot | Wear this | Where |
 |---|---|---|
-| 1 | The Emperor's New Earrings | Ears |
-| 2 | The Emperor's New Necklace | Neck |
-| 3 | The Emperor's New Bracelet | Wrists |
-| 4 | The Emperor's New Ring | Right hand |
-| 5 | The Emperor's New Ring (a second one) | Left hand |
-| 6 | The Emperor's New Hat | Head |
-| 7 | The Emperor's New Breeches | Legs |
+| 1 | Alexandrian earrings | Ears |
+| 2 | Gordian necklace | Neck |
+| 3 | Alexandrian bracelets | Wrists |
+| 4 | Gordian ring | Right hand |
+| 5 | Alexandrian ring | Left hand |
 
-All of them are invisible glamour items sold by Goberin (Western Thanalan) and Tataroga (Mor Dhona). Group 8 of the mod is Housing Tools. The game doesn't play effects on gloves or boots, so those slots aren't offered.
+The mod makes all five invisible, so they don't change your look. Group 6 of the mod is Housing Tools.
 
 ## Installation
 
@@ -119,7 +117,7 @@ Speed changes the whole effect consistently: animations, fades, texture scrollin
 
 Customizing belongs to the **slot**: pick a different effect in that slot and it gets the same color and speed. **Reset all customizing** (under the slots) puts every slot back to normal. Presets save every slot's color and speed. Presets saved in 1.2 (one color for everything) still work.
 
-How it works: the plugin makes customized copies of the effects you're using in a `_SanctumColors` folder inside the Sanctum VFX mod folder, and asks Penumbra to use them for your character. The mod's own files are never changed; the plugin only adds and clears that one folder. Customizing comes back automatically after restarting the game or reimporting the mod.
+How it works: the plugin makes customized copies of the effects you're using in a `_SanctumColors` folder inside the Sanctum VFX 4-Slot mod folder, and asks Penumbra to use them for your character. The mod's own files are never changed; the plugin only adds and clears that one folder. Customizing comes back automatically after restarting the game or reimporting the mod.
 
 Some effects get their color mostly from their textures. Those still take the tint, but may not change as completely; the status line under the slots says which ones.
 
@@ -198,5 +196,5 @@ The plugin talks to Penumbra only through its public IPC (API v5) and never edit
 
 
 - Plugin code: [MIT License](LICENSE).
-- **The Sanctum VFX mod is not part of this repository.** It includes skyboxes by KK, effects by the House VFX author, and effects from the game. Credit and permissions belong to their original authors.
+- **The Sanctum VFX 4-Slot mod is not part of this repository.** It includes skyboxes by KK, effects by the House VFX author, and effects from the game. Credit and permissions belong to their original authors.
 - Built on [Dalamud](https://github.com/goatcorp/Dalamud) and [Penumbra](https://github.com/xivdev/Penumbra).

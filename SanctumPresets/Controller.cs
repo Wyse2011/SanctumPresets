@@ -97,7 +97,9 @@ public sealed class Controller
         if (matches.Count == 0)
             return null;
 
-        // Prefer the 4-slot build if both versions are installed.
+        // Prefer the exact name (the current mod, "Sanctum VFX"), then the 4-slot build, then anything else matching.
+        var exact = matches.FirstOrDefault(m => m.Name.Trim().Equals(key, StringComparison.OrdinalIgnoreCase));
+        if (exact.Directory != null) return exact;
         var best = matches.FirstOrDefault(m => m.Name.Contains("4-Slot", StringComparison.OrdinalIgnoreCase));
         return best.Directory != null ? best : matches[0];
     }
@@ -274,11 +276,18 @@ public sealed class Controller
     /// <summary> Groups renamed in mod updates (old name -> new name), so older presets keep working. </summary>
     public static readonly Dictionary<string, string> Renamed = new(StringComparer.Ordinal)
     {
-        ["6 - Housing Tools"] = "5 - Housing Tools",   // briefly numbered 6 while the mod had a sound slot
+        ["5 - Housing Tools"] = "6 - Housing Tools",   // before the left-ring slot (mod 2.8) took number 5
+        ["8 - Housing Tools"] = "6 - Housing Tools",   // mod 3.1 (seven slots on Emperor's New items)
+        ["9 - Housing Tools"] = "6 - Housing Tools",   // mod 3.0
     };
 
     /// <summary> Groups removed from the mod; presets that mention them skip them silently. </summary>
-    public static readonly HashSet<string> Removed = new(StringComparer.Ordinal) { "5 - Sound (Left Ring)" };
+    public static readonly HashSet<string> Removed = new(StringComparer.Ordinal)
+    {
+        "5 - Sound (Left Ring)",
+        "6 - VFX (Hands)", "8 - VFX (Feet)",   // the game doesn't play effects on gloves or boots
+        "6 - VFX (Head)", "7 - VFX (Legs)",    // Emperor's New gear slots (mod 3.x)
+    };
 
     public Preset? FindPreset(string name)
         => config.Presets.FirstOrDefault(p => p.Name.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase));
